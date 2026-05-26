@@ -2,20 +2,36 @@ import { useState, useEffect, useMemo } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 
+// --- DRILL LIBRARY ---
+// You can easily add more drills here later by finding the FEN string for any position!
+const DRILLS = {
+  openings: [
+    { name: "Sicilian Defense", fen: "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2" },
+    { name: "Ruy Lopez", fen: "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3" },
+    { name: "Italian Game", fen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3" },
+    { name: "Queen's Gambit", fen: "rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq c3 0 2" }
+  ],
+  endgames: [
+    { name: "King & Queen vs King", fen: "8/8/8/8/8/8/5Q2/K6k w - - 0 1" }, // White to mate
+    { name: "King & Rook vs King", fen: "8/8/8/8/8/8/5R2/K6k w - - 0 1" }, // White to mate
+    { name: "Pawn Promotion Race", fen: "8/4P3/8/8/8/8/3p4/K6k w - - 0 1" }
+  ]
+};
+
 export default function App() {
   const [game, setGame] = useState(new Chess());
   const [engine, setEngine] = useState(null);
   
   // App States
-  const [gameMode, setGameMode] = useState('computer'); // 'computer' or 'analyze'
+  const [gameMode, setGameMode] = useState('computer'); // 'computer', 'analyze', 'practice'
   const [engineThinking, setEngineThinking] = useState(false);
   
-  // Analysis Data States
-  const [rawScore, setRawScore] = useState(0); // Evaluation score in centipawns
-  const [bestMoveArrow, setBestMoveArrow] = useState([]); // Array of squares for arrow drawing
-  const [history, setHistory] = useState([]); // Store PGN history for game review
+  // Analysis & History States
+  const [rawScore, setRawScore] = useState(0); 
+  const [bestMoveArrow, setBestMoveArrow] = useState([]); 
+  const [history, setHistory] = useState([]); 
 
-  // 1. Initialize Stockfish (Same as before)
+  // 1. Initialize Stockfish
   useEffect(() => {
     fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.1/stockfish.js')
       .then((res) => res.text())
@@ -26,34 +42,26 @@ export default function App() {
         worker.onmessage = (event) => {
           const line = event.data;
           
-          // Parse Evaluation Score
           if (line.includes('info') && line.includes('score cp')) {
             const match = line.match(/score cp (-?\d+)/);
-            if (match) {
-              setRawScore(parseInt(match[1]));
-            }
+            if (match) setRawScore(parseInt(match[1]));
           }
           
-          // Parse Mate in X
           if (line.includes('info') && line.includes('score mate')) {
              const match = line.match(/score mate (-?\d+)/);
              if(match) {
-                // Map mates to high centipawn scores for the bar logic
                 const mateIn = parseInt(match[1]);
                 setRawScore(mateIn > 0 ? 2000 : -2000); 
              }
           }
 
-          // Parse Best Move
           if (line.includes('bestmove')) {
-            const moveLAN = line.split(' ')[1]; // LAN format e.g., "e2e4"
+            const moveLAN = line.split(' ')[1]; 
             if (moveLAN && moveLAN !== '(none)') {
-              
-              // Handle Arrow Drawing Data
               setBestMoveArrow([[moveLAN.substring(0, 2), moveLAN.substring(2, 4)]]);
 
-              // Handle Computer Playing
-              if (gameMode === 'computer' && game.turn() === 'b') {
+              // If playing against computer (or in practice mode), make the engine's move
+              if ((gameMode === 'computer' || gameMode === 'practice') && game.turn() === 'b') {
                 setGame((currentGame) => {
                   const gameCopy = new Chess(currentGame.fen());
                   try {
@@ -62,6 +70,7 @@ export default function App() {
                       to: moveLAN.substring(2, 4),
                       promotion: moveLAN.substring(4, 5) || 'q'
                     });
+                    setHistory(gameCopy.history());
                     return gameCopy;
                   } catch (e) { return currentGame; }
                 });
@@ -75,34 +84,31 @@ export default function App() {
         setEngine(worker);
       });
     return () => engine?.terminate();
-  }, [gameMode]); // Re-init engine when mode changes for safety
+  }, [gameMode]); 
 
-  // 2. Control Engine Analysis Cycles
+  // 2. Control Engine Cycles
   useEffect(() => {
     if (!engine || game.isGameOver()) return;
     
-    // Always clear arrows when board state changes
     setBestMoveArrow([]);
 
     const runAnalysis = () => {
         setEngineThinking(true);
         engine.postMessage(`position fen ${game.fen()}`);
-        engine.postMessage('go depth 12'); // Slightly deeper for better review accuracy
+        engine.postMessage('go depth 12'); 
     }
 
-    if (gameMode === 'computer' && game.turn() === 'b') {
-        // Computer is playing
+    if ((gameMode === 'computer' || gameMode === 'practice') && game.turn() === 'b') {
         runAnalysis();
     } else if (gameMode === 'analyze') {
-        // Human is reviewing, provide hint arrows instantly
         runAnalysis();
     }
   }, [game, gameMode, engine]);
 
-  // 3. Handle human moves & capture history
+  // 3. Handle human moves
   function onDrop(sourceSquare, targetSquare) {
     if (engineThinking || game.isGameOver()) return false;
-    if (gameMode === 'computer' && game.turn() === 'b') return false;
+    if ((gameMode === 'computer' || gameMode === 'practice') && game.turn() === 'b') return false;
 
     const gameCopy = new Chess(game.fen());
     try {
@@ -113,7 +119,7 @@ export default function App() {
       });
       
       setGame(gameCopy);
-      setHistory(gameCopy.history()); // Store the new move history list
+      setHistory(gameCopy.history());
       return true;
     } catch (error) { return false; }
   }
@@ -126,19 +132,22 @@ export default function App() {
     setEngineThinking(false);
   }
 
-  // 4. UNLIMITED REVIEW CALCULATIONS (The "Premium" stuff)
-  // Calculate the visual height of the white bar
+  function loadDrill(fen) {
+    setGame(new Chess(fen));
+    setRawScore(0);
+    setBestMoveArrow([]);
+    setHistory([]);
+    setEngineThinking(false);
+  }
+
+  // 4. Calculations
   const whiteBarHeight = useMemo(() => {
-    // Treat any advantage > +/- 5 pawns as 'total winning'
     const limit = 500; 
     const clampedScore = Math.max(-limit, Math.min(limit, rawScore));
-    
-    // Map -500 to 0% and +500 to 100%
     const percentage = ((clampedScore + limit) / (limit * 2)) * 100;
     return `${percentage}%`;
   }, [rawScore]);
 
-  // Format score for display text
   const displayScore = useMemo(() => {
     if (Math.abs(rawScore) >= 2000) return "MATE";
     const score = (rawScore / 100).toFixed(1);
@@ -160,67 +169,92 @@ export default function App() {
             style={{...styles.button, backgroundColor: gameMode === 'analyze' ? '#2196F3' : '#4a4a4a'}}
             onClick={() => { setGameMode('analyze'); resetGame(); }}
           >
-            Analyze / Game Review
+            Analyze Review
+          </button>
+          <button 
+            style={{...styles.button, backgroundColor: gameMode === 'practice' ? '#FF9800' : '#4a4a4a'}}
+            onClick={() => { setGameMode('practice'); resetGame(); }}
+          >
+            Practice Drills
           </button>
         </div>
       </div>
       
       <div style={styles.gameArea}>
-        {/* === VISUAL EVALUATION BAR === */}
         <div style={styles.evalBarContainer} title={`Evaluation: ${displayScore}`}>
           <div style={{...styles.whiteBar, height: whiteBarHeight}} />
           <span style={styles.evalText}>{displayScore}</span>
         </div>
 
-        {/* === THE BOARD === */}
         <div style={styles.boardWrapper}>
           <Chessboard 
             position={game.fen()} 
             onPieceDrop={onDrop}
-            // Logic to only draw arrows when in Analyze mode
             customArrows={gameMode === 'analyze' ? bestMoveArrow : []}
-            customArrowColor="rgba(0, 255, 0, 0.5)" // Semi-transparent green
+            customArrowColor="rgba(0, 255, 0, 0.5)"
             customBoardStyle={styles.boardStyle}
           />
         </div>
 
-        {/* === GAME HISTORY PANEL (Simplified Review) === */}
-        <div style={styles.historyPanel}>
-            <h3>Move History</h3>
-            <div style={styles.historyList}>
-                {history.length === 0 && <p style={{color:'#aaa', fontStyle:'italic'}}>No moves yet...</p>}
-                {history.map((move, index) => (
-                    <span key={index} style={styles.historyMove}>
-                        {index % 2 === 0 ? `${(index/2)+1}. ` : ''}{move}
-                    </span>
-                ))}
+        {/* SIDE PANEL: Swaps between History and Drills based on Game Mode */}
+        <div style={styles.sidePanel}>
+          {gameMode === 'practice' ? (
+            <div>
+              <h3 style={{marginTop: 0, color: '#FF9800'}}>Strategy Drills</h3>
+              <p style={{fontSize: '13px', color: '#ccc'}}>Load a position and play it out against Stockfish.</p>
+              
+              <h4 style={{marginBottom: '5px', borderBottom: '1px solid #444'}}>Openings</h4>
+              {DRILLS.openings.map(drill => (
+                <button key={drill.name} style={styles.drillBtn} onClick={() => loadDrill(drill.fen)}>
+                  {drill.name}
+                </button>
+              ))}
+
+              <h4 style={{marginBottom: '5px', marginTop: '15px', borderBottom: '1px solid #444'}}>Endgames</h4>
+              {DRILLS.endgames.map(drill => (
+                <button key={drill.name} style={styles.drillBtn} onClick={() => loadDrill(drill.fen)}>
+                  {drill.name}
+                </button>
+              ))}
             </div>
-            {game.isGameOver() && <button onClick={resetGame} style={{...styles.button, marginTop:'10px', width:'100%'}}>New Game</button>}
+          ) : (
+            <div>
+              <h3 style={{marginTop: 0}}>Move History</h3>
+              <div style={styles.historyList}>
+                  {history.length === 0 && <p style={{color:'#aaa', fontStyle:'italic'}}>No moves yet...</p>}
+                  {history.map((move, index) => (
+                      <span key={index} style={styles.historyMove}>
+                          {index % 2 === 0 ? `${(index/2)+1}. ` : ''}{move}
+                      </span>
+                  ))}
+              </div>
+              {game.isGameOver() && <button onClick={resetGame} style={{...styles.button, marginTop:'15px', width:'100%'}}>New Game</button>}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// Styling (Updated for layout)
+// STYLES
 const styles = {
   container: { display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', backgroundColor: '#161616', color: '#ffffff', fontFamily: 'sans-serif', padding: '10px' },
   header: { textAlign: 'center', width: '100%', marginBottom: '15px' },
-  menu: { display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '10px' },
-  gameArea: { display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '10px', width: '95%', maxWidth: '1000px', flexWrap: 'wrap', justifyContent: 'center' },
+  menu: { display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' },
+  gameArea: { display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '15px', width: '95%', maxWidth: '1000px', flexWrap: 'wrap', justifyContent: 'center' },
   
-  // Eval Bar Styles
-  evalBarContainer: { width: '25px', height: '60vh', backgroundColor: '#333', border: '1px solid #555', position: 'relative', overflow: 'hidden', borderRadius: '3px' },
+  evalBarContainer: { width: '25px', height: '60vh', minHeight: '400px', backgroundColor: '#333', border: '1px solid #555', position: 'relative', overflow: 'hidden', borderRadius: '3px' },
   whiteBar: { backgroundColor: '#eee', width: '100%', position: 'absolute', bottom: 0, left: 0, transition: 'height 0.3s ease-out' },
   evalText: { position: 'absolute', bottom: '2px', left: '50%', transform: 'translateX(-50%)', color: '#000', fontSize: '10px', fontWeight: 'bold', zIndex: 2, textShadow: '0 0 2px #fff' },
 
-  boardWrapper: { flex: '1 1 500px', maxWidth: '600px' },
+  boardWrapper: { flex: '1 1 400px', maxWidth: '600px' },
   boardStyle: { borderRadius: '4px', boxShadow: '0 5px 15px rgba(0, 0, 0, 0.5)' },
   
-  // History Styles
-  historyPanel: { flex: '1 1 200px', maxWidth: '300px', backgroundColor: '#242424', padding: '15px', borderRadius: '8px', minHeight: '300px', boxSizing:'border-box' },
-  historyList: { display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '14px', maxHeight: '40vh', overflowY: 'auto' },
+  sidePanel: { flex: '1 1 200px', maxWidth: '300px', backgroundColor: '#242424', padding: '15px', borderRadius: '8px', minHeight: '400px', boxSizing:'border-box' },
+  historyList: { display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '14px', maxHeight: '45vh', overflowY: 'auto' },
   historyMove: { color: '#ddd' },
   
-  button: { padding: '8px 16px', fontSize: '14px', cursor: 'pointer', color: 'white', border: 'none', borderRadius: '4px', transition: 'background-color 0.2s' }
+  button: { padding: '8px 16px', fontSize: '14px', cursor: 'pointer', color: 'white', border: 'none', borderRadius: '4px', transition: 'background-color 0.2s' },
+  drillBtn: { display: 'block', width: '100%', padding: '6px', marginBottom: '5px', backgroundColor: '#333', color: '#fff', border: '1px solid #444', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', fontSize: '13px' }
 };
