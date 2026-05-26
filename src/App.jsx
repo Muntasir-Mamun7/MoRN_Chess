@@ -1,48 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 
 const PIECE_NAMES = { p: 'Pawn', n: 'Knight', b: 'Bishop', r: 'Rook', q: 'Queen', k: 'King' };
 
 // ==========================================
-// THEMES & CONFIGURATION
+// THEMES & ACADEMY DATA
 // ==========================================
 const BOARD_THEMES = {
   green: { light: '#eeeed2', dark: '#769656' },
   wood: { light: '#f0d9b5', dark: '#b58863' },
   ocean: { light: '#dee3e6', dark: '#8ca2ad' },
-  dark: { light: '#aaaaaa', dark: '#555555' }
+  dark: { light: '#aaaaaa', dark: '#555555' },
+  portugal: { light: '#f4f4f4', dark: '#d32f2f' } // Custom Red Theme
 };
 
 const ACADEMY = {
   openings: {
     london: {
-      name: "The London System (Full Tree)",
+      name: "The London System",
       description: "Learn how to react no matter what Black plays.",
       startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-      tree: {
-        "d4": {
-          comment: "Excellent. Grab the center.",
-          responses: {
-            "d5": {
-              nextPrompt: "Black plays d5. Now bring out your dark-squared bishop to f4.",
-              correctMove: "Bf4",
-              responses: {
-                "Nf6": { nextPrompt: "Black develops a knight. Solidify your center with e3.", correctMove: "e3" }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  tactics: {
-    fork: {
-      name: "Tactics: The Knight Fork",
-      description: "Learn how to attack two pieces at the exact same time.",
-      startFen: "rnbqkbnr/ppp1pppp/8/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
-      prompt: "White has set up a trap. Look for a double attack square.",
-      solution: "Nxe5" 
+      tree: { "d4": { responses: { "d5": { correctMove: "Bf4", nextPrompt: "Bring out your dark-squared bishop to f4.", responses: { "Nf6": { correctMove: "e3", nextPrompt: "Solidify your center with e3." } } } } } }
     }
   }
 };
@@ -52,15 +31,16 @@ export default function App() {
   const [engine, setEngine] = useState(null);
   
   // Interface Configuration
-  const [gameMode, setGameMode] = useState('computer'); // computer, review, academy, settings
+  const [gameMode, setGameMode] = useState('computer'); 
   const [engineThinking, setEngineThinking] = useState(false);
   const [rawScore, setRawScore] = useState(0);
   const [bestMoveArrow, setBestMoveArrow] = useState([]);
   const [history, setHistory] = useState([]);
   
-  // Settings State
-  const [aiLevel, setAiLevel] = useState(5); // 1 to 10
+  // Settings
+  const [aiLevel, setAiLevel] = useState(5); 
   const [boardTheme, setBoardTheme] = useState('green');
+  const [isVoiceMuted, setIsVoiceMuted] = useState(false);
 
   // Click-to-move Tracking
   const [moveFrom, setMoveFrom] = useState('');
@@ -71,14 +51,25 @@ export default function App() {
   const [reviewMoves, setReviewMoves] = useState([]);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(-1);
   const [coachExplanation, setCoachExplanation] = useState('');
+  const [currentClassification, setCurrentClassification] = useState('');
   const [suggestedAlternativeLAN, setSuggestedAlternativeLAN] = useState('');
   const [isViewingAlt, setIsViewingAlt] = useState(false);
+  const [isReviewAnalyzing, setIsReviewAnalyzing] = useState(false);
 
-  // Academy State
-  const [activeLesson, setActiveLesson] = useState(null);
-  const [lessonType, setLessonType] = useState(''); 
-  const [currentNode, setCurrentNode] = useState(null);
-  const [lessonPrompt, setLessonPrompt] = useState('');
+  // Ref to handle Stockfish state machine without stale closures
+  const evalRef = useRef({ step: 'idle', scoreBefore: 0, scoreAfter: 0, bestMove: '', moveData: null });
+
+  // ==========================================
+  // VOICE SYNTHESIS ENGINE
+  // ==========================================
+  const speakText = (text) => {
+    if (isVoiceMuted || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel(); // Stop current speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.05;
+    window.speechSynthesis.speak(utterance);
+  };
 
   // ==========================================
   // INITIALIZE STOCKFISH ENGINE
@@ -93,32 +84,55 @@ export default function App() {
         worker.onmessage = (e) => {
           const line = e.data;
           
+          // 1. Capture Evaluation Scores
           if (line.includes('info') && line.includes('score cp')) {
             const match = line.match(/score cp (-?\d+)/);
-            if (match) setRawScore(parseInt(match[1]));
+            if (match) {
+              const score = parseInt(match[1]);
+              if (evalRef.current.step === 'eval_before') evalRef.current.scoreBefore = score;
+              else if (evalRef.current.step === 'eval_after') evalRef.current.scoreAfter = score;
+              else setRawScore(score); // Normal play updates
+            }
           }
           
+          if (line.includes('info') && line.includes('score mate')) {
+            const match = line.match(/score mate (-?\d+)/);
+            if (match) {
+              const score = parseInt(match[1]) > 0 ? 2000 : -2000;
+              if (evalRef.current.step === 'eval_before') evalRef.current.scoreBefore = score;
+              else if (evalRef.current.step === 'eval_after') evalRef.current.scoreAfter = score;
+            }
+          }
+
+          // 2. Capture Best Move & State Transitions
           if (line.includes('bestmove')) {
             const moveLAN = line.split(' ')[1];
-            if (moveLAN && moveLAN !== '(none)') {
+            
+            if (evalRef.current.step === 'eval_before') {
+              // We just finished evaluating the position BEFORE the mistake.
+              evalRef.current.bestMove = moveLAN;
+              setSuggestedAlternativeLAN(moveLAN);
+              evalRef.current.step = 'eval_after';
+              // Now evaluate the position AFTER the user's move
+              worker.postMessage(`position fen ${evalRef.current.moveData.fenAfter}`);
+              worker.postMessage('go depth 10'); // Fast evaluation for the UI
+            } 
+            else if (evalRef.current.step === 'eval_after') {
+              // We have both scores! Calculate the true differential.
+              evalRef.current.step = 'idle';
+              finalizeReviewAnalysis(); 
+            } 
+            else if (moveLAN && moveLAN !== '(none)') {
+              // NORMAL PLAY AI RESPONSE
               const from = moveLAN.substring(0, 2);
               const to = moveLAN.substring(2, 4);
-              
-              if (gameMode !== 'review') {
-                setBestMoveArrow([[from, to]]);
-              } else {
-                setSuggestedAlternativeLAN(moveLAN);
-              }
+              setBestMoveArrow([[from, to]]);
 
-              // AI PLAYING LOGIC
               if (gameMode === 'computer' && game.turn() === 'b' && !game.isGameOver()) {
                 setGame(curr => {
                   const c = new Chess(curr.fen());
-                  try {
-                    c.move({ from, to, promotion: 'q' });
-                    setHistory(c.history({ verbose: true }));
-                    return c;
-                  } catch(err) { return curr; }
+                  try { c.move({ from, to, promotion: 'q' }); setHistory(c.history({ verbose: true })); return c; } 
+                  catch(err) { return curr; }
                 });
               }
               setEngineThinking(false);
@@ -130,26 +144,21 @@ export default function App() {
         setEngine(worker);
       });
     return () => engine?.terminate();
-  }, [gameMode]);
+  }, [gameMode, game]);
 
-  // AI Level Configuration Trigger
+  // General AI Difficulty Settings
   useEffect(() => {
-    if (engine) {
-      // Map 1-10 to Stockfish Skill Level 0-20
-      const skill = Math.max(0, (aiLevel - 1) * 2); 
-      engine.postMessage(`setoption name Skill Level value ${skill}`);
-    }
+    if (engine) engine.postMessage(`setoption name Skill Level value ${Math.max(0, (aiLevel - 1) * 2)}`);
   }, [aiLevel, engine]);
 
-  // Trigger engine analysis
+  // Trigger engine for normal play
   useEffect(() => {
-    if (!engine || game.isGameOver()) return;
+    if (!engine || game.isGameOver() || gameMode === 'review') return;
     setEngineThinking(true);
     engine.postMessage(`position fen ${game.fen()}`);
-    // Map Level 1-10 to search depth (minimum depth 2 for speed, max 14)
-    const searchDepth = gameMode === 'review' ? 14 : Math.max(2, aiLevel + 2);
-    engine.postMessage(`go depth ${searchDepth}`); 
+    engine.postMessage(`go depth ${Math.max(2, aiLevel + 2)}`); 
   }, [game, engine, gameMode, aiLevel]);
+
 
   // ==========================================
   // CLICK TO MOVE & HIGHLIGHT SYSTEM
@@ -159,10 +168,7 @@ export default function App() {
     if (moves.length === 0) { setOptionSquares({}); return; }
     const squares = {};
     moves.forEach(m => {
-      squares[m.to] = {
-        background: game.get(m.to) ? 'radial-gradient(circle, rgba(255,0,0,0.6) 85%, transparent 85%)' : 'radial-gradient(circle, rgba(0,255,0,0.4) 25%, transparent 25%)',
-        borderRadius: '50%'
-      };
+      squares[m.to] = { background: game.get(m.to) ? 'radial-gradient(circle, rgba(255,0,0,0.6) 85%, transparent 85%)' : 'radial-gradient(circle, rgba(0,255,0,0.4) 25%, transparent 25%)', borderRadius: '50%' };
     });
     squares[square] = { background: 'rgba(255, 255, 0, 0.4)' };
     setOptionSquares(squares);
@@ -172,150 +178,53 @@ export default function App() {
     if (gameMode === 'review' || engineThinking) return;
     if (!moveFrom) {
       const piece = game.get(square);
-      if (piece && piece.color === game.turn()) {
-        setMoveFrom(square);
-        updateOptionSquares(square);
-      }
+      if (piece && piece.color === game.turn()) { setMoveFrom(square); updateOptionSquares(square); }
       return;
     }
     const gameCopy = new Chess(game.fen());
     try {
-      const move = gameCopy.move({ from: moveFrom, to: square, promotion: 'q' });
-      if (move) {
-        if (gameMode === 'academy') handleAcademyMove(move.san, gameCopy);
-        else { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); }
-      }
+      if (gameCopy.move({ from: moveFrom, to: square, promotion: 'q' })) { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); }
     } catch (e) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) { setMoveFrom(square); updateOptionSquares(square); return; }
     }
-    setMoveFrom('');
-    setOptionSquares({});
+    setMoveFrom(''); setOptionSquares({});
   }
 
   function handlePieceDrop(source, target) {
     if (gameMode === 'review' || engineThinking) return false;
     const gameCopy = new Chess(game.fen());
     try {
-      const move = gameCopy.move({ from: source, to: target, promotion: 'q' });
-      if (move) { 
-        if (gameMode === 'academy') handleAcademyMove(move.san, gameCopy);
-        else { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); }
-        return true; 
-      }
+      if (gameCopy.move({ from: source, to: target, promotion: 'q' })) { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); return true; }
     } catch (e) { return false; }
     return false;
   }
 
-  function handleAcademyMove(san, parsedGame) {
-    if (lessonType === 'openings' && currentNode && currentNode[san]) {
-      const userNode = currentNode[san];
-      let nextStateGame = new Chess(parsedGame.fen());
-      const responseKeys = Object.keys(userNode.responses || {});
-      
-      if (responseKeys.length > 0) {
-        const opponentMove = responseKeys[0]; 
-        const branch = userNode.responses[opponentMove];
-        setTimeout(() => {
-          nextStateGame.move(opponentMove);
-          setGame(nextStateGame);
-          setCurrentNode(branch.responses || {});
-          setLessonPrompt(branch.nextPrompt || "Great choice. Play your next structural setup move.");
-        }, 800);
-        setGame(parsedGame);
-      } else {
-        setGame(parsedGame);
-        setLessonPrompt("Excellent work! Line Mastered successfully.");
-      }
-    } else {
-      alert("That's not the correct line for this lesson!");
-    }
-  }
-
   // ==========================================
-  // PREMIUM GAME REVIEW ENGINE
+  // TRUE DIFFERENTIAL GAME REVIEW ENGINE
   // ==========================================
   function importPgn() {
     if (!pgnInput) return;
     try {
       const tempGame = new Chess();
       tempGame.loadPgn(pgnInput);
-      const fullHistory = tempGame.history({ verbose: true });
+      const moves = tempGame.history({ verbose: true });
       
-      const parsedReview = fullHistory.map((m, idx) => {
-        const fenBefore = idx === 0 ? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" : fullHistory[idx-1].after;
-        
-        let classification = "Good";
-        if (m.san.includes('#')) classification = "Great Move"; 
-        else if (idx < 6) classification = "Book";
-        else if (m.flags.includes('c') && !m.san.includes('+')) classification = "Best Move"; 
-        else if (m.san.includes('+')) classification = "Great Move"; 
-        else if (idx % 8 === 0) classification = "Blunder"; 
-        else if (idx % 5 === 0) classification = "Mistake";
-        
-        return { ...m, fenBefore, classification };
+      const replayBoard = new Chess();
+      const parsedReview = moves.map((m) => {
+        const fenBefore = replayBoard.fen();
+        replayBoard.move(m.san);
+        const fenAfter = replayBoard.fen();
+        return { ...m, fenBefore, fenAfter };
       });
 
       setReviewMoves(parsedReview);
       setGameMode('review');
-      setCurrentReviewIndex(0);
-      setGame(new Chess(parsedReview[0].fen));
-      generateDynamicCoachText(parsedReview[0]);
-      
-      // Analyze position BEFORE move to generate best alternative arrow
-      if (engine) {
-        engine.postMessage(`position fen ${parsedReview[0].fenBefore}`);
-        engine.postMessage('go depth 14');
-      }
+      setCurrentReviewIndex(-1); // Resets state so clicking 'Next' triggers Move 1 correctly
+      setGame(new Chess());
+      setCoachExplanation("Ready to review. Use the Next button to analyze your moves.");
     } catch(err) {
       alert("Invalid PGN Data. Ensure you copied raw game notation.");
-    }
-  }
-
-  function generateDynamicCoachText(move) {
-    if (!move) return;
-    const piece = PIECE_NAMES[move.piece];
-    const isCapture = move.flags.includes('c');
-    const isCheck = move.san.includes('+');
-    let text = "";
-    
-    if (move.classification === "Book") text = `Moving the ${piece} to ${move.to} is established opening theory.`;
-    else if (move.classification === "Blunder" || move.classification === "Mistake") {
-      text = `This ${piece} move is a ${move.classification.toLowerCase()}. `;
-      text += isCapture ? `Capturing on ${move.to} looks tempting, but it opens you to a counter-attack. ` : `Moving to ${move.to} surrenders control of key squares. `;
-      text += "Look at the Green Arrow on the board to see what you should have played.";
-    } 
-    else if (move.classification === "Great Move" || move.classification === "Best Move") {
-      text = `Excellent! `;
-      text += isCheck ? `Checking the King forces your opponent to react defensively. ` : isCapture ? `Capturing on ${move.to} wins material. ` : `Placing the ${piece} on ${move.to} controls the center perfectly.`;
-    } 
-    else text = `A solid developing move. The ${piece} is well placed on ${move.to}.`;
-    
-    setCoachExplanation(text);
-  }
-
-  function showAlternativeLine() {
-    if (!suggestedAlternativeLAN || currentReviewIndex === -1) return;
-    const currentMove = reviewMoves[currentReviewIndex];
-    const altGame = new Chess(currentMove.fenBefore); 
-    try {
-      altGame.move({
-        from: suggestedAlternativeLAN.substring(0, 2),
-        to: suggestedAlternativeLAN.substring(2, 4),
-        promotion: 'q'
-      });
-      setGame(altGame);
-      setIsViewingAlt(true);
-      setCoachExplanation(`Here is the engine's best move. Playing this maintains a much stronger evaluation.`);
-    } catch(e) {}
-  }
-
-  function resetToCurrentReviewMove() {
-    const currentMove = reviewMoves[currentReviewIndex];
-    if (currentMove) {
-      setGame(new Chess(currentMove.fen));
-      setIsViewingAlt(false);
-      generateDynamicCoachText(currentMove); 
     }
   }
 
@@ -324,14 +233,86 @@ export default function App() {
     const newIdx = currentReviewIndex + direction;
     if (newIdx >= 0 && newIdx < reviewMoves.length) {
       setCurrentReviewIndex(newIdx);
-      const targetMove = reviewMoves[newIdx];
-      setGame(new Chess(targetMove.fen));
-      generateDynamicCoachText(targetMove);
+      const move = reviewMoves[newIdx];
+      
+      // Physically update the board to the played move
+      setGame(new Chess(move.fenAfter));
+      
+      // Start the Live Stockfish Analysis
+      setIsReviewAnalyzing(true);
+      setCoachExplanation("Coach is calculating variations...");
+      setCurrentClassification("Analyzing...");
+      
+      evalRef.current = { step: 'eval_before', scoreBefore: 0, scoreAfter: 0, bestMove: '', moveData: move };
       
       if (engine) {
-        engine.postMessage(`position fen ${targetMove.fenBefore}`);
-        engine.postMessage('go depth 14');
+        engine.postMessage(`position fen ${move.fenBefore}`);
+        engine.postMessage('go depth 10'); 
       }
+    }
+  }
+
+  function finalizeReviewAnalysis() {
+    const move = evalRef.current.moveData;
+    const scoreBefore = evalRef.current.scoreBefore;
+    // Stockfish score is relative to the side to move. We must invert the after score to compare.
+    const scoreAfter = -evalRef.current.scoreAfter; 
+    const delta = scoreAfter - scoreBefore; // Negative delta means the move was bad for the player
+
+    let classification = "Good";
+    if (delta < -300) classification = "Blunder";
+    else if (delta < -100) classification = "Mistake";
+    else if (delta < -40) classification = "Inaccuracy";
+    else if (delta > -20 && move.lan === evalRef.current.bestMove) classification = "Best Move";
+    else if (delta > 50) classification = "Great Move";
+
+    setCurrentClassification(classification);
+    generateDynamicCoachText(move, classification);
+    setIsReviewAnalyzing(false);
+  }
+
+  function generateDynamicCoachText(move, classification) {
+    const piece = PIECE_NAMES[move.piece];
+    const isCapture = move.flags.includes('c');
+    let text = "";
+    
+    if (classification === "Blunder" || classification === "Mistake") {
+      text = `This ${piece} move is a ${classification.toLowerCase()}. `;
+      text += isCapture ? `Capturing on ${move.to} opens you up to a severe counter-attack. ` : `Moving to ${move.to} surrenders control and drops your evaluation significantly. `;
+      text += "Click the 'View Best Move' button to see the engine's recommended line.";
+    } 
+    else if (classification === "Great Move" || classification === "Best Move") {
+      text = `Excellent! You found the strongest continuation. `;
+      text += isCapture ? `Capturing on ${move.to} secures a material advantage. ` : `Placing the ${piece} on ${move.to} commands the board perfectly.`;
+    } 
+    else {
+      text = `A solid move. The ${piece} is safely placed on ${move.to}, though the engine had alternative ideas.`;
+    }
+    
+    setCoachExplanation(text);
+    speakText(text); // Speak the evaluation aloud!
+  }
+
+  function showAlternativeLine() {
+    if (!suggestedAlternativeLAN || currentReviewIndex === -1) return;
+    const move = reviewMoves[currentReviewIndex];
+    const altGame = new Chess(move.fenBefore); 
+    try {
+      altGame.move({ from: suggestedAlternativeLAN.substring(0, 2), to: suggestedAlternativeLAN.substring(2, 4), promotion: 'q' });
+      setGame(altGame);
+      setIsViewingAlt(true);
+      const text = `Here is the engine's alternative. Playing this maintains a much stronger evaluation.`;
+      setCoachExplanation(text);
+      speakText(text);
+    } catch(e) {}
+  }
+
+  function resetToCurrentReviewMove() {
+    const move = reviewMoves[currentReviewIndex];
+    if (move) {
+      setGame(new Chess(move.fenAfter));
+      setIsViewingAlt(false);
+      generateDynamicCoachText(move, currentClassification); 
     }
   }
 
@@ -343,47 +324,36 @@ export default function App() {
     setGame(new Chess());
     setHistory([]);
     setReviewMoves([]);
-    setActiveLesson(null);
+    setCurrentReviewIndex(-1);
     setIsViewingAlt(false);
+    window.speechSynthesis?.cancel(); // Stop talking when leaving mode
   }
 
-  // Calculate Eval Bar
-  const visualHeight = useMemo(() => {
-    const clamped = Math.max(-500, Math.min(500, rawScore));
-    return `${((clamped + 500) / 1000) * 100}%`;
-  }, [rawScore]);
-
-  // Determine Custom Highlight Squares for Review Mode
   const activeSquareStyles = useMemo(() => {
     let styles = { ...optionSquares };
     if (gameMode === 'review' && currentReviewIndex >= 0 && reviewMoves[currentReviewIndex] && !isViewingAlt) {
       const move = reviewMoves[currentReviewIndex];
-      // Highlight from and to squares in yellow
-      styles[move.from] = { backgroundColor: 'rgba(255, 255, 0, 0.5)' };
-      styles[move.to] = { backgroundColor: 'rgba(255, 255, 0, 0.5)' };
+      // Highlight exact moved squares automatically
+      styles[move.from] = { backgroundColor: 'rgba(255, 255, 0, 0.4)' };
+      styles[move.to] = { backgroundColor: 'rgba(255, 255, 0, 0.6)' };
     }
     return styles;
   }, [optionSquares, gameMode, currentReviewIndex, reviewMoves, isViewingAlt]);
 
-  // Determine Arrows for Review Mode
   const activeArrows = useMemo(() => {
     if (gameMode === 'review') {
-       if (isViewingAlt) return []; // Don't show arrow if we already played the alt move
-       // Show the engine's recommended alternative move in green
-       if (suggestedAlternativeLAN) {
+       if (isViewingAlt) return []; 
+       if (!isReviewAnalyzing && suggestedAlternativeLAN && currentClassification !== "Best Move" && currentClassification !== "Great Move") {
          return [[suggestedAlternativeLAN.substring(0, 2), suggestedAlternativeLAN.substring(2, 4)]];
        }
        return [];
     }
     return bestMoveArrow;
-  }, [gameMode, isViewingAlt, suggestedAlternativeLAN, bestMoveArrow]);
+  }, [gameMode, isViewingAlt, suggestedAlternativeLAN, isReviewAnalyzing, currentClassification, bestMoveArrow]);
 
-  const badgeColorMap = { "Book": "#a5a5a5", "Great Move": "#1baca1", "Best Move": "#4CAF50", "Good": "#96bc4b", "Mistake": "#f7c04a", "Blunder": "#b23333" };
+  const badgeColorMap = { "Best Move": "#4CAF50", "Great Move": "#1baca1", "Good": "#96bc4b", "Inaccuracy": "#8c8c8c", "Mistake": "#f7c04a", "Blunder": "#b23333", "Analyzing...": "#555" };
   const currentTheme = BOARD_THEMES[boardTheme];
 
-  // ==========================================
-  // RENDER
-  // ==========================================
   return (
     <>
       <style>{`
@@ -396,30 +366,20 @@ export default function App() {
         
         .main-layout { display: flex; gap: 20px; width: 100%; max-width: 1000px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
         
-        .eval-bar { width: 25px; height: 60vh; min-height: 400px; background-color: #333; position: relative; border-radius: 4px; overflow: hidden; border: 1px solid #444; }
-        .eval-fill { background-color: #fff; width: 100%; position: absolute; bottom: 0; left: 0; transition: height 0.4s ease; }
-        .eval-text { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); color: #000; font-weight: bold; font-size: 11px; z-index: 10; }
-        
-        .board-container { flex: 1 1 400px; max-width: 600px; width: 100%; }
-        
+        .board-container { flex: 1 1 400px; max-width: 600px; width: 100%; position: relative; }
         .side-panel { flex: 1 1 300px; max-width: 400px; width: 100%; background-color: #1e1e1e; border-radius: 8px; padding: 20px; box-sizing: border-box; min-height: 480px; display: flex; flex-direction: column; }
         
-        /* Mobile Breakpoint */
         @media (max-width: 768px) {
-          .eval-bar { display: none; } /* Hide eval bar on small screens to save space */
           .main-layout { gap: 15px; }
           .board-container { max-width: 100%; }
           .side-panel { max-width: 100%; min-height: auto; }
         }
 
-        .list-btn { display: block; width: 100%; padding: 12px; background-color: #2a2a2a; color: #fff; border: 1px solid #333; border-radius: 4px; margin-bottom: 8px; cursor: pointer; text-align: left; }
         .action-btn { width: 100%; padding: 12px; background-color: #2196F3; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        
         .badge { display: flex; flex-direction: column; align-items: center; background-color: #2d2d2d; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center; }
-        .badge-tag { font-size: 14px; font-weight: bold; color: #fff; padding: 6px 16px; border-radius: 4px; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-tag { font-size: 14px; font-weight: bold; color: #fff; padding: 6px 16px; border-radius: 4px; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; transition: background-color 0.3s; }
         
-        .coach-box { background-color: #262626; border-left: 4px solid #2196F3; border-radius: 4px; padding: 15px; margin-top: 15px; }
-        
+        .coach-box { background-color: #262626; border-left: 4px solid #2196F3; border-radius: 4px; padding: 15px; margin-top: 15px; display: flex; flex-direction: column; }
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #333; }
         select, input[type="range"] { padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #555; }
       `}</style>
@@ -428,21 +388,13 @@ export default function App() {
         <div className="header">
           <h1>MoRN Chess Engine</h1>
           <div className="menu">
-            <button className="btn" style={{backgroundColor: gameMode === 'computer' ? '#4CAF50' : '#4a4a4a'}} onClick={() => resetToBase('computer')}>Play vs AI</button>
-            <button className="btn" style={{backgroundColor: gameMode === 'review' ? '#2196F3' : '#4a4a4a'}} onClick={() => resetToBase('review')}>Analyze Game</button>
-            <button className="btn" style={{backgroundColor: gameMode === 'academy' ? '#9C27B0' : '#4a4a4a'}} onClick={() => resetToBase('academy')}>Academy</button>
+            <button className="btn" style={{backgroundColor: gameMode === 'computer' ? '#4CAF50' : '#4a4a4a'}} onClick={() => resetToBase('computer')}>Play AI</button>
+            <button className="btn" style={{backgroundColor: gameMode === 'review' ? '#2196F3' : '#4a4a4a'}} onClick={() => resetToBase('review')}>Analyze Match</button>
             <button className="btn" style={{backgroundColor: gameMode === 'settings' ? '#FF9800' : '#4a4a4a'}} onClick={() => resetToBase('settings')}>Settings</button>
           </div>
         </div>
 
         <div className="main-layout">
-          
-          {/* EVAL BAR */}
-          <div className="eval-bar">
-            <div className="eval-fill" style={{ height: visualHeight }} />
-            <span className="eval-text">{(rawScore/100).toFixed(1)}</span>
-          </div>
-
           {/* CHESSBOARD */}
           <div className="board-container">
             <Chessboard
@@ -455,6 +407,7 @@ export default function App() {
               customLightSquareStyle={{ backgroundColor: currentTheme.light }}
               customArrows={activeArrows}
               customArrowColor={isViewingAlt ? "rgba(33, 150, 243, 0.6)" : "rgba(0, 255, 0, 0.6)"}
+              animationDuration={300}
             />
           </div>
 
@@ -477,70 +430,71 @@ export default function App() {
                     <option value="green">Classic Green</option>
                     <option value="wood">Tournament Wood</option>
                     <option value="ocean">Ocean Blue</option>
+                    <option value="portugal">Portugal Red</option>
                     <option value="dark">Midnight Dark</option>
                   </select>
                 </div>
-                
-                <p style={{fontSize: '13px', color: '#888', marginTop: '20px'}}>Changes save automatically. Return to 'Play vs AI' to test your new settings!</p>
+
+                <div className="setting-row">
+                  <label><strong>Coach Voice</strong></label>
+                  <button className="btn" style={{backgroundColor: isVoiceMuted ? '#d32f2f' : '#4CAF50'}} onClick={() => setIsVoiceMuted(!isVoiceMuted)}>
+                    {isVoiceMuted ? '🔇 Muted' : '🔊 Active'}
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* ACADEMY PANEL */}
-            {gameMode === 'academy' && (
-              <div>
-                <h3 style={{color: '#9C27B0', marginTop: 0}}>Interactive Academy</h3>
-                {!activeLesson ? (
-                  <div>
-                    <h4>Master Openings</h4>
-                    {Object.keys(ACADEMY.openings).map(k => (
-                      <button key={k} className="list-btn" onClick={() => loadLesson('openings', k)}>{ACADEMY.openings[k].name}</button>
-                    ))}
-                  </div>
-                ) : (
-                  <div>
-                    <div className="coach-box" style={{borderColor: '#9C27B0'}}>{lessonPrompt}</div>
-                    <button className="action-btn" style={{backgroundColor: '#d32f2f', marginTop: '20px'}} onClick={() => resetToBase('academy')}>Exit Lesson</button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* REVIEW PANEL */}
+            {/* TRUE GAME REVIEW PANEL */}
             {gameMode === 'review' && (
               <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
-                <h3 style={{color: '#2196F3', marginTop: 0}}>Game Review</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <h3 style={{color: '#2196F3', marginTop: 0}}>Advanced Review</h3>
+                  <button style={{background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '20px'}} onClick={() => setIsVoiceMuted(!isVoiceMuted)} title="Toggle Voice Coach">
+                    {isVoiceMuted ? '🔇' : '🔊'}
+                  </button>
+                </div>
+                
                 {reviewMoves.length === 0 ? (
                   <div>
                     <textarea style={{width: '100%', height: '150px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', padding: '10px', marginBottom: '10px', boxSizing:'border-box'}} placeholder="Paste PGN here..." value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} />
-                    <button className="action-btn" onClick={importPgn}>Run Deep Evaluation</button>
+                    <button className="action-btn" onClick={importPgn}>Evaluate Logic Flow</button>
                   </div>
                 ) : (
                   <div style={{display: 'flex', flexDirection: 'column', flex: 1}}>
-                    <div className="badge" style={{outline: isViewingAlt ? '2px solid #2196F3' : 'none'}}>
-                       <span style={{fontSize: '14px', color: '#ccc'}}>Move {currentReviewIndex + 1}</span>
-                       <h2 style={{margin: '5px 0'}}>{isViewingAlt ? "Engine Best Move" : `Played: ${reviewMoves[currentReviewIndex]?.san}`}</h2>
-                       {!isViewingAlt && (
-                         <div className="badge-tag" style={{ backgroundColor: badgeColorMap[reviewMoves[currentReviewIndex]?.classification] || '#444' }}>
-                           {reviewMoves[currentReviewIndex]?.classification}
-                         </div>
-                       )}
-                    </div>
+                    {currentReviewIndex >= 0 ? (
+                      <>
+                        <div className="badge" style={{outline: isViewingAlt ? '2px solid #2196F3' : 'none'}}>
+                           <span style={{fontSize: '14px', color: '#ccc'}}>Move {currentReviewIndex + 1}</span>
+                           <h2 style={{margin: '5px 0'}}>{isViewingAlt ? "Engine Alternative" : `Played: ${reviewMoves[currentReviewIndex]?.san}`}</h2>
+                           {!isViewingAlt && (
+                             <div className="badge-tag" style={{ backgroundColor: badgeColorMap[currentClassification] || '#444' }}>
+                               {isReviewAnalyzing ? "Analyzing..." : currentClassification}
+                             </div>
+                           )}
+                        </div>
 
-                    <div className="coach-box">
-                       <div style={{fontWeight: 'bold', color: '#2196F3', marginBottom: '6px'}}>♟️ Virtual Coach:</div>
-                       <p style={{margin: 0, fontSize: '14px', lineHeight: '1.5'}}>{coachExplanation}</p>
-                    </div>
+                        <div className="coach-box">
+                           <div style={{fontWeight: 'bold', color: '#2196F3', marginBottom: '6px'}}>♟️ Virtual Coach:</div>
+                           <p style={{margin: 0, fontSize: '14px', lineHeight: '1.5'}}>{coachExplanation}</p>
+                        </div>
 
-                    {(!isViewingAlt && (reviewMoves[currentReviewIndex]?.classification === "Blunder" || reviewMoves[currentReviewIndex]?.classification === "Mistake")) && (
-                      <button className="action-btn" style={{backgroundColor: '#1baca1', marginTop: '15px'}} onClick={showAlternativeLine}>🔍 View Best Move Alternative</button>
-                    )}
-                    {isViewingAlt && (
-                      <button className="action-btn" style={{backgroundColor: '#666', marginTop: '15px'}} onClick={resetToCurrentReviewMove}>↩ Return to My Move</button>
+                        {(!isViewingAlt && !isReviewAnalyzing && (currentClassification === "Blunder" || currentClassification === "Mistake" || currentClassification === "Inaccuracy")) && (
+                          <button className="action-btn" style={{backgroundColor: '#1baca1', marginTop: '15px'}} onClick={showAlternativeLine}>🔍 View Best Alternative</button>
+                        )}
+                        {isViewingAlt && (
+                          <button className="action-btn" style={{backgroundColor: '#666', marginTop: '15px'}} onClick={resetToCurrentReviewMove}>↩ Return to My Move</button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="coach-box" style={{flex: 1, justifyContent: 'center', textAlign: 'center'}}>
+                         <p style={{margin: 0, fontSize: '16px'}}>PGN Loaded Successfully.</p>
+                         <p style={{color: '#aaa', fontSize: '13px'}}>Click Next to begin the deep tactical analysis.</p>
+                      </div>
                     )}
 
                     <div style={{display:'flex', gap:'10px', marginTop:'auto', paddingTop: '20px'}}>
-                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === 0} onClick={() => navigateReview(-1)}>← Prev</button>
-                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === reviewMoves.length - 1} onClick={() => navigateReview(1)}>Next →</button>
+                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex <= 0 || isReviewAnalyzing} onClick={() => navigateReview(-1)}>← Prev</button>
+                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === reviewMoves.length - 1 || isReviewAnalyzing} onClick={() => navigateReview(1)}>Next →</button>
                     </div>
                   </div>
                 )}
