@@ -12,6 +12,8 @@ const BOARD_THEMES = {
   portugal: { light: '#f4f4f4', dark: '#d32f2f' }
 };
 
+const ANALYSIS_STEP_TIMEOUT_MS = 8000;
+
 // ==========================================
 // SUPERCHARGED SASSY CHESS MASTER TEMPLATES
 // ==========================================
@@ -101,6 +103,7 @@ export default function App() {
 
   // Refs for background workers
   const batchRef = useRef({ isActive: false, queue: [], results: [], currentScore: 0, parsedReview: [] });
+  const analysisTimeoutRef = useRef(null);
 
   // Load physical browser voice files natively
   useEffect(() => {
@@ -130,6 +133,45 @@ export default function App() {
     }
     window.speechSynthesis.speak(utterance);
   };
+
+  function clearAnalysisTimeout() {
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
+  }
+
+  function queueBatchPosition(fenToEvaluate) {
+    if (!engine || !batchRef.current.isActive) return;
+    clearAnalysisTimeout();
+    engine.postMessage(`position fen ${fenToEvaluate}`);
+    engine.postMessage('go depth 10');
+    analysisTimeoutRef.current = setTimeout(() => {
+      if (!batchRef.current.isActive) return;
+      handleBatchResult('');
+    }, ANALYSIS_STEP_TIMEOUT_MS);
+  }
+
+  function handleBatchResult(moveLAN = '') {
+    if (!batchRef.current.isActive) return;
+    clearAnalysisTimeout();
+
+    batchRef.current.results.push({
+      score: batchRef.current.currentScore,
+      bestMove: moveLAN && moveLAN !== '(none)' ? moveLAN : ''
+    });
+
+    const total = batchRef.current.queue.length || 1;
+    const completed = batchRef.current.results.length;
+    setAnalysisProgress((completed / total) * 100);
+
+    if (completed < total) {
+      const nextFen = batchRef.current.queue[completed];
+      queueBatchPosition(nextFen);
+    } else {
+      finishBatchAnalysis();
+    }
+  }
 
   // ==========================================
   // ENGINE LOGIC UNIT
@@ -166,21 +208,7 @@ export default function App() {
             
             // FULL GAME BATCH ANALYSIS LOOP
             if (batchRef.current.isActive) {
-              batchRef.current.results.push({
-                score: batchRef.current.currentScore,
-                bestMove: moveLAN
-              });
-
-              const progress = (batchRef.current.results.length / batchRef.current.queue.length) * 100;
-              setAnalysisProgress(progress);
-
-              if (batchRef.current.results.length < batchRef.current.queue.length) {
-                const nextFen = batchRef.current.queue[batchRef.current.results.length];
-                worker.postMessage(`position fen ${nextFen}`);
-                worker.postMessage('go depth 10'); // Fast evaluation for the batch process
-              } else {
-                finishBatchAnalysis();
-              }
+              handleBatchResult(moveLAN);
             } 
             else if (moveLAN && moveLAN !== '(none)') {
               const from = moveLAN.substring(0, 2);
@@ -201,7 +229,10 @@ export default function App() {
         worker.postMessage('uci');
         setEngine(worker);
       });
-    return () => engine?.terminate();
+    return () => {
+      clearAnalysisTimeout();
+      engine?.terminate();
+    };
   }, [gameMode, game]);
 
   useEffect(() => {
@@ -257,6 +288,10 @@ export default function App() {
   // ==========================================
   function importPgn() {
     if (!pgnInput) return;
+    if (!engine) {
+      alert("Engine is still loading. Please wait a moment and try again.");
+      return;
+    }
     try {
       const tempGame = new Chess();
       tempGame.loadPgn(pgnInput);
@@ -280,8 +315,7 @@ export default function App() {
       setGame(new Chess());
       
       // Start the engine loop
-      engine.postMessage(`position fen ${fenList[0]}`);
-      engine.postMessage('go depth 10');
+      queueBatchPosition(fenList[0]);
 
     } catch(err) {
       alert("Invalid PGN format block.");
@@ -290,6 +324,8 @@ export default function App() {
 
   function finishBatchAnalysis() {
     const { parsedReview, results } = batchRef.current;
+    clearAnalysisTimeout();
+    setAnalysisProgress(100);
     
     // Safety check: ensure results length matches parsedReview length
     const finalResults = results.length >= parsedReview.length + 1 ? results : [...results, ...Array(parsedReview.length + 1 - results.length).fill({score: 0, bestMove: ''})];
@@ -318,10 +354,12 @@ export default function App() {
     setIsFullGameAnalyzing(false);
     batchRef.current.isActive = false;
     
-    setCurrentReviewIndex(0);
-    setGame(new Chess(finalizedMoves[0].fenAfter));
-    setCurrentClassification(finalizedMoves[0].classification);
-    compileDeepCoachReport(finalizedMoves[0], finalizedMoves[0].classification, finalizedMoves[0].bestMoveLAN);
+    if (finalizedMoves.length > 0) {
+      setCurrentReviewIndex(0);
+      setGame(new Chess(finalizedMoves[0].fenAfter));
+      setCurrentClassification(finalizedMoves[0].classification);
+      compileDeepCoachReport(finalizedMoves[0], finalizedMoves[0].classification, finalizedMoves[0].bestMoveLAN);
+    }
   }
 
   function navigateReview(direction) {
@@ -398,6 +436,8 @@ export default function App() {
   }
 
   function resetToBase(mode) {
+    clearAnalysisTimeout();
+    batchRef.current.isActive = false;
     setGameMode(mode);
     setGame(new Chess());
     setHistory([]);
