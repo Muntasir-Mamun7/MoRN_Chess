@@ -20,13 +20,16 @@ const COACH_TEMPLATES = {
     "Wake up! Moving the {piece} to {to} is a complete hallucination. You just hung a massive tactical weakness. {alt_phrase}",
     "Ouch. Did your finger slip? Playing the {piece} to {to} drops the evaluation bar into the abyss. You completely ignored the board's tension. {alt_phrase}",
     "Absolutely not. Are we playing checkers? The {piece} on {to} walks right into a nightmare. Your opponent is definitely thanking you. {alt_phrase}",
-    "A tragic blunder! You severed your own piece coordination. Moving the {piece} to {to} neglects your defense completely. {alt_phrase}"
+    "A tragic blunder! You severed your own piece coordination. Moving the {piece} to {to} neglects your defense completely. {alt_phrase}",
+    "My silicon brain hurts looking at this. The {piece} to {to} is an absolute disaster. You're bleeding material. {alt_phrase}",
+    "Is this a sacrifice or a donation? Moving the {piece} to {to} simply throws the game away. {alt_phrase}"
   ],
   Mistake: [
     "Not the right idea at all. The {piece} on {to} looks active, but it actually surrenders the positional advantage and loses crucial tempo. {alt_phrase}",
     "A strategic misstep. By playing the {piece} to {to}, you allowed your opponent to improve their setup without breaking a sweat. {alt_phrase}",
     "You're drifting. Moving the {piece} to {to} is way too passive and bites on granite. It hands the central control back to the enemy. {alt_phrase}",
-    "A clear mistake. The {piece} on {to} creates a structural weakness that will haunt you for the rest of the game. {alt_phrase}"
+    "A clear mistake. The {piece} on {to} creates a structural weakness that will haunt you for the rest of the game. {alt_phrase}",
+    "Suboptimal geometry. Playing the {piece} to {to} gets in the way of your own development. You are stepping on your own toes here. {alt_phrase}"
   ],
   Inaccuracy: [
     "A minor inaccuracy. The {piece} to {to} is playable, but you missed a golden chance to seize the initiative by the throat. {alt_phrase}",
@@ -89,12 +92,15 @@ export default function App() {
   const [currentReviewIndex, setCurrentReviewIndex] = useState(-1);
   const [coachExplanation, setCoachExplanation] = useState('');
   const [currentClassification, setCurrentClassification] = useState('');
-  const [suggestedAlternativeLAN, setSuggestedAlternativeLAN] = useState('');
   const [isViewingAlt, setIsViewingAlt] = useState(false);
-  const [isReviewAnalyzing, setIsReviewAnalyzing] = useState(false);
   const [boardAnimationSpeed, setBoardAnimationSpeed] = useState(250);
 
-  const evalRef = useRef({ step: 'idle', scoreBefore: 0, scoreAfter: 0, bestMove: '', moveData: null });
+  // Full Game Analysis State
+  const [isFullGameAnalyzing, setIsFullGameAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+
+  // Refs for background workers
+  const batchRef = useRef({ isActive: false, queue: [], results: [], currentScore: 0, parsedReview: [] });
 
   // Load physical browser voice files natively
   useEffect(() => {
@@ -142,8 +148,7 @@ export default function App() {
             const match = line.match(/score cp (-?\d+)/);
             if (match) {
               const score = parseInt(match[1]);
-              if (evalRef.current.step === 'eval_before') evalRef.current.scoreBefore = score;
-              else if (evalRef.current.step === 'eval_after') evalRef.current.scoreAfter = score;
+              if (batchRef.current.isActive) batchRef.current.currentScore = score;
               else setRawScore(score); 
             }
           }
@@ -152,24 +157,30 @@ export default function App() {
             const match = line.match(/score mate (-?\d+)/);
             if (match) {
               const score = parseInt(match[1]) > 0 ? 2500 : -2500;
-              if (evalRef.current.step === 'eval_before') evalRef.current.scoreBefore = score;
-              else if (evalRef.current.step === 'eval_after') evalRef.current.scoreAfter = score;
+              if (batchRef.current.isActive) batchRef.current.currentScore = score;
             }
           }
 
           if (line.includes('bestmove')) {
             const moveLAN = line.split(' ')[1];
             
-            if (evalRef.current.step === 'eval_before') {
-              evalRef.current.bestMove = moveLAN;
-              setSuggestedAlternativeLAN(moveLAN);
-              evalRef.current.step = 'eval_after';
-              worker.postMessage(`position fen ${evalRef.current.moveData.fenAfter}`);
-              worker.postMessage('go depth 12');
-            } 
-            else if (evalRef.current.step === 'eval_after') {
-              evalRef.current.step = 'idle';
-              calculateDifferentialMetrics(); 
+            // FULL GAME BATCH ANALYSIS LOOP
+            if (batchRef.current.isActive) {
+              batchRef.current.results.push({
+                score: batchRef.current.currentScore,
+                bestMove: moveLAN
+              });
+
+              const progress = (batchRef.current.results.length / batchRef.current.queue.length) * 100;
+              setAnalysisProgress(progress);
+
+              if (batchRef.current.results.length < batchRef.current.queue.length) {
+                const nextFen = batchRef.current.queue[batchRef.current.results.length];
+                worker.postMessage(`position fen ${nextFen}`);
+                worker.postMessage('go depth 10'); // Fast evaluation for the batch process
+              } else {
+                finishBatchAnalysis();
+              }
             } 
             else if (moveLAN && moveLAN !== '(none)') {
               const from = moveLAN.substring(0, 2);
@@ -194,18 +205,18 @@ export default function App() {
   }, [gameMode, game]);
 
   useEffect(() => {
-    if (engine) engine.postMessage(`setoption name Skill Level value ${Math.max(0, (aiLevel - 1) * 2)}`);
-  }, [aiLevel, engine]);
+    if (engine && !isFullGameAnalyzing) engine.postMessage(`setoption name Skill Level value ${Math.max(0, (aiLevel - 1) * 2)}`);
+  }, [aiLevel, engine, isFullGameAnalyzing]);
 
   useEffect(() => {
-    if (!engine || game.isGameOver() || gameMode === 'review') return;
+    if (!engine || game.isGameOver() || gameMode === 'review' || isFullGameAnalyzing) return;
     setEngineThinking(true);
     engine.postMessage(`position fen ${game.fen()}`);
     engine.postMessage(`go depth ${Math.max(2, aiLevel + 2)}`); 
-  }, [game, engine, gameMode, aiLevel]);
+  }, [game, engine, gameMode, aiLevel, isFullGameAnalyzing]);
 
   function handleSquareClick(square) {
-    if (gameMode === 'review' || engineThinking) return;
+    if (gameMode === 'review' || engineThinking || isFullGameAnalyzing) return;
     if (!moveFrom) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) { setMoveFrom(square); updateOptionSquares(square); }
@@ -222,7 +233,7 @@ export default function App() {
   }
 
   function handlePieceDrop(source, target) {
-    if (gameMode === 'review' || engineThinking) return false;
+    if (gameMode === 'review' || engineThinking || isFullGameAnalyzing) return false;
     const gameCopy = new Chess(game.fen());
     try {
       if (gameCopy.move({ from: source, to: target, promotion: 'q' })) { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); return true; }
@@ -242,7 +253,7 @@ export default function App() {
   }
 
   // ==========================================
-  // PERFECTED DIFFERENTIAL CHESS.COM LOGIC
+  // CHESS.COM STYLE FULL GAME BATCH ANALYSIS
   // ==========================================
   function importPgn() {
     if (!pgnInput) return;
@@ -259,60 +270,76 @@ export default function App() {
         return { ...m, fenBefore, fenAfter };
       });
 
-      setReviewMoves(parsedReview);
+      // Prepare queue for full game analysis
+      const fenList = ["rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", ...parsedReview.map(m => m.fenAfter)];
+      
+      batchRef.current = { isActive: true, queue: fenList, results: [], currentScore: 0, parsedReview };
+      setIsFullGameAnalyzing(true);
+      setAnalysisProgress(0);
       setGameMode('review');
-      setCurrentReviewIndex(-1);
       setGame(new Chess());
-      setCoachExplanation("PGN imported safely to MoRN Chess servers. Click 'Next Move' to generate accurate engine commentary.");
+      
+      // Start the engine loop
+      engine.postMessage(`position fen ${fenList[0]}`);
+      engine.postMessage('go depth 10');
+
     } catch(err) {
       alert("Invalid PGN format block.");
     }
   }
 
+  function finishBatchAnalysis() {
+    const { parsedReview, results } = batchRef.current;
+    
+    const finalizedMoves = parsedReview.map((m, idx) => {
+      const beforeData = results[idx];
+      const afterData = results[idx + 1];
+
+      const scoreBefore = beforeData.score;
+      const scoreAfter = -afterData.score; 
+      const delta = scoreAfter - scoreBefore;
+
+      let classification = "Good";
+      if (delta < -250) classification = "Blunder";
+      else if (delta < -80) classification = "Mistake";
+      else if (delta < -30) classification = "Inaccuracy";
+      else if (m.lan === beforeData.bestMove || delta > -10) classification = "Best Move";
+      else if (delta > 50) classification = "Great Move";
+
+      if (idx < 6 && classification !== "Blunder" && classification !== "Mistake") classification = "Book";
+
+      return { ...m, classification, bestMoveLAN: beforeData.bestMove, delta };
+    });
+
+    setReviewMoves(finalizedMoves);
+    setIsFullGameAnalyzing(false);
+    batchRef.current.isActive = false;
+    
+    // Auto-start review at Move 1
+    setCurrentReviewIndex(0);
+    setGame(new Chess(finalizedMoves[0].fenAfter));
+    setCurrentClassification(finalizedMoves[0].classification);
+    compileDeepCoachReport(finalizedMoves[0], finalizedMoves[0].classification, finalizedMoves[0].bestMoveLAN);
+  }
+
   function navigateReview(direction) {
     setIsViewingAlt(false);
-    setBoardAnimationSpeed(250); // Restore smooth animation for regular navigation
+    setBoardAnimationSpeed(250); 
     const newIdx = currentReviewIndex + direction;
     if (newIdx >= 0 && newIdx < reviewMoves.length) {
       setCurrentReviewIndex(newIdx);
       const move = reviewMoves[newIdx];
-      
       setGame(new Chess(move.fenAfter));
-      setIsReviewAnalyzing(true);
-      setCurrentClassification("Analyzing...");
-      
-      evalRef.current = { step: 'eval_before', scoreBefore: 0, scoreAfter: 0, bestMove: '', moveData: move };
-      engine?.postMessage(`position fen ${move.fenBefore}`);
-      engine?.postMessage('go depth 12'); 
+      setCurrentClassification(move.classification);
+      compileDeepCoachReport(move, move.classification, move.bestMoveLAN);
     }
   }
 
-  function calculateDifferentialMetrics() {
-    const move = evalRef.current.moveData;
-    const before = evalRef.current.scoreBefore;
-    const after = -evalRef.current.scoreAfter; 
-    const delta = after - before;
-
-    // Adjusted to mirror standard engine thresholds
-    let classification = "Good";
-    if (delta < -300) classification = "Blunder";
-    else if (delta < -100) classification = "Mistake";
-    else if (delta < -50) classification = "Inaccuracy";
-    else if (move.lan === evalRef.current.bestMove || delta > -10) classification = "Best Move";
-    else if (delta > 150) classification = "Great Move";
-
-    if (currentReviewIndex < 4 && classification !== "Blunder" && classification !== "Mistake") classification = "Book";
-
-    setCurrentClassification(classification);
-    compileDeepCoachReport(move, classification);
-    setIsReviewAnalyzing(false);
-  }
-
-  function compileDeepCoachReport(move, classification) {
-    const piece = PIECE_NAMES[move.piece];
+  function compileDeepCoachReport(move, classification, bestMoveLAN) {
+    const colorText = move.color === 'w' ? 'White' : 'Black';
+    const piece = `${colorText} ${PIECE_NAMES[move.piece]}`;
     const toSquare = move.to;
     
-    // Check for specific contexts to make the AI sound incredibly smart
     const isCapture = move.flags.includes('c');
     const isCheck = move.san.includes('+');
     
@@ -320,24 +347,22 @@ export default function App() {
     if (isCapture) contextBonus = ` You captured a crucial piece on ${toSquare}.`;
     else if (isCheck) contextBonus = ` By delivering a sharp check on ${toSquare}, you force the opponent to react entirely on your terms.`;
 
-    const pool = COACH_TEMPLATES[classification];
+    const pool = COACH_TEMPLATES[classification] || COACH_TEMPLATES["Good"];
     const rawTemplate = pool[Math.floor(Math.random() * pool.length)];
     
     let dynamicText = rawTemplate.replace(/{piece}/g, piece).replace(/{to}/g, toSquare);
     
-    // If it's a good move, append the context bonus
     if (["Good", "Great Move", "Best Move"].includes(classification)) {
       dynamicText += contextBonus;
     }
 
-    // Only inject alternative phrasing if it's a bad move
-    if (["Blunder", "Mistake", "Inaccuracy"].includes(classification)) {
-      const altFrom = suggestedAlternativeLAN.substring(0, 2);
-      const altTo = suggestedAlternativeLAN.substring(2, 4);
+    if (["Blunder", "Mistake", "Inaccuracy"].includes(classification) && bestMoveLAN) {
+      const altFrom = bestMoveLAN.substring(0, 2);
+      const altTo = bestMoveLAN.substring(2, 4);
       const altPhrase = `Instead, the engine screams for you to move from ${altFrom} to ${altTo}. Why? Because ${altTo} controls critical central geometry and applies undeniable pressure. Check the alternative line.`;
       dynamicText = dynamicText.replace(/{alt_phrase}/g, altPhrase);
     } else {
-      dynamicText = dynamicText.replace(/{alt_phrase}/g, ""); // Remove placeholder if it exists
+      dynamicText = dynamicText.replace(/{alt_phrase}/g, ""); 
     }
 
     setCoachExplanation(dynamicText.trim());
@@ -345,15 +370,16 @@ export default function App() {
   }
 
   function showAlternativeLine() {
-    if (!suggestedAlternativeLAN || currentReviewIndex === -1) return;
-    const move = reviewMoves[currentReviewIndex];
-    const altGame = new Chess(move.fenBefore); 
+    const currentMove = reviewMoves[currentReviewIndex];
+    if (!currentMove || !currentMove.bestMoveLAN) return;
+    
+    const altGame = new Chess(currentMove.fenBefore); 
     try {
-      setBoardAnimationSpeed(0); // Instantly snap the board to avoid collision physics
-      altGame.move({ from: suggestedAlternativeLAN.substring(0, 2), to: suggestedAlternativeLAN.substring(2, 4), promotion: 'q' });
+      setBoardAnimationSpeed(0); 
+      altGame.move({ from: currentMove.bestMoveLAN.substring(0, 2), to: currentMove.bestMoveLAN.substring(2, 4), promotion: 'q' });
       setGame(altGame);
       setIsViewingAlt(true);
-      const text = `Take a look at the board now. By playing to ${suggestedAlternativeLAN.substring(2,4)}, your pieces coordinate flawlessly. You maintain safety while putting the enemy on their heels.`;
+      const text = `Take a look at the board now. By playing to ${currentMove.bestMoveLAN.substring(2,4)}, your pieces coordinate flawlessly. You maintain safety while putting the enemy on their heels.`;
       setCoachExplanation(text);
       speakWithPersona(text);
     } catch(e) {}
@@ -362,10 +388,10 @@ export default function App() {
   function resetToCurrentReviewMove() {
     const move = reviewMoves[currentReviewIndex];
     if (move) {
-      setBoardAnimationSpeed(0); // Snap back to reality smoothly
+      setBoardAnimationSpeed(0); 
       setGame(new Chess(move.fenAfter));
       setIsViewingAlt(false);
-      compileDeepCoachReport(move, currentClassification); 
+      compileDeepCoachReport(move, move.classification, move.bestMoveLAN); 
     }
   }
 
@@ -376,6 +402,7 @@ export default function App() {
     setReviewMoves([]);
     setCurrentReviewIndex(-1);
     setIsViewingAlt(false);
+    setIsFullGameAnalyzing(false);
     window.speechSynthesis?.cancel();
   }
 
@@ -397,20 +424,19 @@ export default function App() {
   const activeArrows = useMemo(() => {
     if (gameMode === 'review') {
        if (isViewingAlt) return []; 
-       // ONLY draw arrows if the move is NOT a Good/Best/Great move
-       if (!isReviewAnalyzing && suggestedAlternativeLAN && ["Blunder", "Mistake", "Inaccuracy"].includes(currentClassification)) {
-         return [[suggestedAlternativeLAN.substring(0, 2), suggestedAlternativeLAN.substring(2, 4)]];
+       const currentMove = reviewMoves[currentReviewIndex];
+       if (currentMove && currentMove.bestMoveLAN && ["Blunder", "Mistake", "Inaccuracy"].includes(currentMove.classification)) {
+         return [[currentMove.bestMoveLAN.substring(0, 2), currentMove.bestMoveLAN.substring(2, 4)]];
        }
        return [];
     }
     return bestMoveArrow;
-  }, [gameMode, isViewingAlt, suggestedAlternativeLAN, isReviewAnalyzing, currentClassification, bestMoveArrow]);
+  }, [gameMode, isViewingAlt, reviewMoves, currentReviewIndex, bestMoveArrow]);
 
-  const badgeColorMap = { "Best Move": "#4CAF50", "Great Move": "#1baca1", "Book": "#a5a5a5", "Good": "#96bc4b", "Inaccuracy": "#8c8c8c", "Mistake": "#f7c04a", "Blunder": "#b23333", "Analyzing...": "#555" };
+  const badgeColorMap = { "Best Move": "#4CAF50", "Great Move": "#1baca1", "Book": "#a5a5a5", "Good": "#96bc4b", "Inaccuracy": "#8c8c8c", "Mistake": "#f7c04a", "Blunder": "#b23333" };
   const currentTheme = BOARD_THEMES[boardTheme];
 
-  // Determine if we should show the "View Alternative" button based on strict logic
-  const showAlternativeButton = !isViewingAlt && !isReviewAnalyzing && ["Blunder", "Mistake", "Inaccuracy"].includes(currentClassification);
+  const showAlternativeButton = !isViewingAlt && ["Blunder", "Mistake", "Inaccuracy"].includes(currentClassification);
 
   return (
     <>
@@ -438,6 +464,7 @@ export default function App() {
 
         .action-btn { width: 100%; padding: 14px; background-color: #d32f2f; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background-color 0.2s; font-size: 15px; }
         .action-btn:hover { filter: brightness(1.1); }
+        .action-btn:disabled { background-color: #555; cursor: not-allowed; }
         .badge { display: flex; flex-direction: column; align-items: center; background-color: #262626; padding: 20px; border-radius: 8px; border: 1px solid #333; text-align: center; }
         .badge-tag { font-size: 15px; font-weight: 900; color: #fff; padding: 8px 20px; border-radius: 6px; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         
@@ -446,6 +473,9 @@ export default function App() {
         select, input[type="range"] { padding: 12px; border-radius: 6px; background: #333; color: white; border: 1px solid #555; width: 100%; box-sizing: border-box; font-size: 14px; outline: none; }
         select:focus { border-color: #d32f2f; }
         
+        .progress-bar { width: 100%; height: 20px; background-color: #333; border-radius: 10px; overflow: hidden; margin-top: 20px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #2196F3, #9C27B0); transition: width 0.3s ease; }
+
         .footer { text-align: center; padding: 20px; background-color: #161616; border-top: 1px solid #2a2a2a; color: #888; font-size: 13px; width: 100%; box-sizing: border-box; }
         .footer span { color: #d32f2f; font-weight: bold; }
       `}</style>
@@ -535,28 +565,37 @@ export default function App() {
               <div style={{display: 'flex', flexDirection: 'column', height: '100%', flex: 1}}>
                 <h3 style={{color: '#2196F3', margin: '0 0 15px 0'}}>Match Analytics</h3>
                 
-                {reviewMoves.length === 0 ? (
+                {reviewMoves.length === 0 && !isFullGameAnalyzing ? (
                   <div>
                     <textarea style={{width: '100%', height: '180px', background: '#161616', color: '#fff', border: '1px solid #444', padding: '12px', marginBottom: '15px', boxSizing:'border-box', borderRadius: '6px', fontFamily: 'monospace'}} placeholder="Paste Chess.com PGN notation blocks here..." value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} />
                     <button className="action-btn" style={{backgroundColor: '#2196F3'}} onClick={importPgn}>Evaluate Game</button>
                   </div>
+                ) : isFullGameAnalyzing ? (
+                  <div className="coach-box" style={{textAlign: 'center', padding: '50px 20px', backgroundColor: '#262626'}}>
+                     <h2 style={{margin: '0 0 10px 0', color: '#2196F3'}}>Deep Analysis Running</h2>
+                     <p style={{color: '#ccc', fontSize: '14px', margin: 0, lineHeight: '1.5'}}>MoRN Engine is evaluating the entire game sequentially to generate accurate coaching reports.</p>
+                     <div className="progress-bar">
+                       <div className="progress-fill" style={{width: `${analysisProgress}%`}}></div>
+                     </div>
+                     <p style={{marginTop: '10px', fontSize: '12px', color: '#888'}}>{Math.round(analysisProgress)}% Complete</p>
+                  </div>
                 ) : (
                   <div style={{display: 'flex', flexDirection: 'column', flex: 1}}>
-                    {currentReviewIndex >= 0 ? (
+                    {currentReviewIndex >= 0 && (
                       <>
                         <div className="badge" style={{outline: isViewingAlt ? '2px solid #2196F3' : 'none'}}>
                            <span style={{fontSize: '13px', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px'}}>Move {currentReviewIndex + 1}</span>
                            <h2 style={{margin: '8px 0', fontSize: '24px'}}>{isViewingAlt ? "Engine Alternative" : `Played: ${reviewMoves[currentReviewIndex]?.san}`}</h2>
                            {!isViewingAlt && (
                              <div className="badge-tag" style={{ backgroundColor: badgeColorMap[currentClassification] || '#444' }}>
-                               {isReviewAnalyzing ? "Analyzing..." : currentClassification}
+                               {currentClassification}
                              </div>
                            )}
                         </div>
 
                         <div className="coach-box" style={{borderColor: badgeColorMap[currentClassification] || '#2196F3'}}>
                            <div style={{fontWeight: 'bold', color: badgeColorMap[currentClassification] || '#2196F3', marginBottom: '8px', fontSize: '15px'}}>♟️ Coach Insights:</div>
-                           <p style={{margin: 0, fontSize: '14.5px', lineHeight: '1.6', color: '#e0e0e0'}}>{coachExplanation}</p>
+                           <p style={{margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#e0e0e0'}}>{coachExplanation}</p>
                         </div>
 
                         {showAlternativeButton && (
@@ -566,16 +605,11 @@ export default function App() {
                           <button className="action-btn" style={{backgroundColor: '#666', marginTop: '15px'}} onClick={resetToCurrentReviewMove}>↩ Return to My Move</button>
                         )}
                       </>
-                    ) : (
-                      <div className="coach-box" style={{textAlign: 'center', padding: '50px 20px', backgroundColor: '#262626'}}>
-                         <h2 style={{margin: '0 0 10px 0', color: '#4CAF50'}}>PGN Parsed!</h2>
-                         <p style={{color: '#ccc', fontSize: '14px', margin: 0, lineHeight: '1.5'}}>Your game has been loaded into the MoRN Evaluation Servers. Click 'Next' to begin the post-mortem analysis.</p>
-                      </div>
                     )}
 
                     <div style={{display:'flex', gap:'10px', marginTop:'auto', paddingTop: '20px'}}>
-                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex <= 0 || isReviewAnalyzing} onClick={() => navigateReview(-1)}>← Prev</button>
-                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === reviewMoves.length - 1 || isReviewAnalyzing} onClick={() => navigateReview(1)}>Next →</button>
+                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex <= 0} onClick={() => navigateReview(-1)}>← Prev</button>
+                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === reviewMoves.length - 1} onClick={() => navigateReview(1)}>Next →</button>
                     </div>
                   </div>
                 )}
