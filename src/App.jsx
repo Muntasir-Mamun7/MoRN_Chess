@@ -291,30 +291,8 @@ export default function App() {
   function finishBatchAnalysis() {
     const { parsedReview, results } = batchRef.current;
     
-    const finalizedMoves = parsedReview.map((m, idx) => {
-      const beforeData = results[idx];
-      const afterData = results[idx + 1];
-
-      const scoreBefore = beforeData.score;
-      const scoreAfter = -afterData.score; 
-      const delta = scoreAfter - scoreBefore;
-
-      let classification = "Good";
-      if (delta < -250) classification = "Blunder";
-      else if (delta < -80) classification = "Mistake";
-      else if (delta < -30) classification = "Inaccuracy";
-      else if (m.lan === beforeData.bestMove || delta > -10) classification = "Best Move";
-      else if (delta > 50) classification = "Great Move";
-
-      if (idx < 6 && classification !== "Blunder" && classification !== "Mistake") classification = "Book";
-
-      return { ...m, classification, bestMoveLAN: beforeData.bestMove, delta };
-    });
-function finishBatchAnalysis() {
-    const { parsedReview, results } = batchRef.current;
-    
     // Safety check: ensure results length matches parsedReview length
-    const finalResults = results.length === parsedReview.length ? results : [...results, ...Array(parsedReview.length - results.length).fill({score: 0, bestMove: ''})];
+    const finalResults = results.length >= parsedReview.length + 1 ? results : [...results, ...Array(parsedReview.length + 1 - results.length).fill({score: 0, bestMove: ''})];
 
     const finalizedMoves = parsedReview.map((m, idx) => {
       const beforeData = finalResults[idx] || {score: 0, bestMove: ''};
