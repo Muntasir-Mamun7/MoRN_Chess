@@ -12,59 +12,56 @@ const BOARD_THEMES = {
   portugal: { light: '#f4f4f4', dark: '#d32f2f' }
 };
 
-const ANALYSIS_STEP_TIMEOUT_MS = 8000;
+const ANALYSIS_STEP_TIMEOUT_MS = 5000;
 
 // ==========================================
-// SUPERCHARGED SASSY CHESS MASTER TEMPLATES
+// EDUCATIONAL & SASSY CHESS MASTER TEMPLATES
 // ==========================================
 const COACH_TEMPLATES = {
   Blunder: [
-    "Wake up! Moving the {piece} to {to} is a complete hallucination. You just hung a massive tactical weakness. {alt_phrase}",
-    "Ouch. Did your finger slip? Playing the {piece} to {to} drops the evaluation bar into the abyss. You completely ignored the board's tension. {alt_phrase}",
-    "Absolutely not. Are we playing checkers? The {piece} on {to} walks right into a nightmare. Your opponent is definitely thanking you. {alt_phrase}",
+    "Ouch! Moving the {piece} to {to} gives up a lot of ground. In chess, we call this a blunder because it hangs material or overlooks a major threat. {alt_phrase}",
+    "Even Grandmasters make mistakes, but the {piece} to {to} is definitely one to learn from. You completely ignored the board's tension. {alt_phrase}",
+    "Did your finger slip? Playing the {piece} to {to} drops the evaluation bar into the abyss. {alt_phrase}",
     "A tragic blunder! You severed your own piece coordination. Moving the {piece} to {to} neglects your defense completely. {alt_phrase}",
-    "My silicon brain hurts looking at this. The {piece} to {to} is an absolute disaster. You're bleeding material. {alt_phrase}",
-    "Is this a sacrifice or a donation? Moving the {piece} to {to} simply throws the game away. {alt_phrase}"
+    "My silicon brain hurts looking at this. The {piece} to {to} throws away your hard-earned advantage. {alt_phrase}"
   ],
   Mistake: [
-    "Not the right idea at all. The {piece} on {to} looks active, but it actually surrenders the positional advantage and loses crucial tempo. {alt_phrase}",
+    "Not the most accurate plan. The {piece} on {to} looks okay at a glance, but it actually surrenders your positional advantage and loses tempo. {alt_phrase}",
     "A strategic misstep. By playing the {piece} to {to}, you allowed your opponent to improve their setup without breaking a sweat. {alt_phrase}",
-    "You're drifting. Moving the {piece} to {to} is way too passive and bites on granite. It hands the central control back to the enemy. {alt_phrase}",
-    "A clear mistake. The {piece} on {to} creates a structural weakness that will haunt you for the rest of the game. {alt_phrase}",
-    "Suboptimal geometry. Playing the {piece} to {to} gets in the way of your own development. You are stepping on your own toes here. {alt_phrase}"
+    "You're drifting a bit here. Moving the {piece} to {to} is too passive. It hands the central control back to the enemy. {alt_phrase}",
+    "A clear mistake. The {piece} on {to} creates a structural weakness that your opponent can use as a target later. {alt_phrase}"
   ],
   Inaccuracy: [
-    "A minor inaccuracy. The {piece} to {to} is playable, but you missed a golden chance to seize the initiative by the throat. {alt_phrase}",
-    "Slightly passive. You moved the {piece} to {to}, which defends well enough, but there was a much sharper continuation. {alt_phrase}",
+    "A slight inaccuracy. Moving the {piece} to {to} is playable, but it lets your opponent off the hook. {alt_phrase}",
+    "Slightly passive play. You moved the {piece} to {to}, which defends well enough, but there was a much sharper continuation. {alt_phrase}",
     "Not the most precise choice. The {piece} on {to} allows the opponent to equalize the position a bit too easily. {alt_phrase}",
-    "It's okay, but just okay. Committing the {piece} to {to} this early releases the tension. The engine wanted more. {alt_phrase}"
+    "It's okay, but just okay. Committing the {piece} to {to} this early releases the tension. The engine wanted more pressure. {alt_phrase}"
   ],
   Good: [
-    "Solid, fundamental chess. The {piece} to {to} improves your coordination and fights for central control. No need to complicate things here.",
+    "Solid, fundamental chess. The {piece} to {to} improves your coordination and fights for central control. No need to overcomplicate things here.",
     "A reliable positional choice. Placing the {piece} on {to} asks a tough question of your opponent while keeping your structure rock solid.",
     "Good development. The {piece} on {to} eyes critical squares and prepares your forces for the transition into the attack.",
-    "A very sound prophylactic move. Moving the {piece} to {to} stops their immediate counterplay and keeps you completely safe.",
-    "Good play. You activated the {piece} to {to} safely, keeping the tension high and your options open."
+    "A very sound prophylactic move. Moving the {piece} to {to} stops their immediate counterplay and keeps your King safe.",
+    "Good, sensible play. You activated the {piece} to {to} safely, keeping the tension high and your options open."
   ],
   "Great Move": [
-    "Boom! Brilliant vision. Moving the {piece} to {to} exploits a massive tactical vulnerability in their camp. The pressure is suffocating!",
+    "Excellent vision! The {piece} on {to} applies massive pressure and forces your opponent into a tight defensive spot.",
     "Great move! The {piece} on {to} completely shifts the positional balance in your favor. You are dominating the board geometry.",
     "An incredibly strong tactical decision. Placing the {piece} on {to} creates unanswerable threats. Masterful execution.",
     "Fantastic foresight. The {piece} to {to} paralyzes their defense and perfectly aligns with your attacking vectors."
   ],
   "Best Move": [
-    "Magnus Carlsen, is that you? The {piece} to {to} is the absolute best engine move. Flawless tactical execution.",
+    "Spot on! The {piece} to {to} is exactly what the engine wanted. You saw the board like a Grandmaster here.",
     "Engine approved! Placing the {piece} on {to} destroys their counterplay and secures a massive, undeniable advantage.",
     "Chess perfection. The {piece} to {to} is the only move that maintains the winning edge. Beautifully calculated.",
-    "Absolute precision. Playing the {piece} to {to} demonstrates deep strategic mastery. You saw exactly what the position demanded."
+    "Absolute precision. Playing the {piece} to {to} demonstrates deep strategic mastery. You found the absolute best continuation."
   ],
   Book: [
-    "This is deep opening preparation. The {piece} to {to} follows established Grandmaster theory.",
-    "Standard theoretical lines. Moving the {piece} to {to} secures your share of the center and develops harmoniously.",
-    "A textbook opening response. The {piece} on {to} prepares your king for safety and readies your army for the middlegame."
+    "Standard opening theory. The {piece} to {to} establishes your presence in the center and develops smoothly.",
+    "Following established Grandmaster theory. Moving the {piece} to {to} secures your share of the board.",
+    "A textbook opening response. The {piece} on {to} readies your army for the upcoming middlegame."
   ]
 };
-
 export default function App() {
   const [game, setGame] = useState(new Chess());
   const [engine, setEngine] = useState(null);
@@ -120,11 +117,10 @@ export default function App() {
   const speakWithPersona = (text) => {
     if (isVoiceMuted || !window.speechSynthesis) return;
     window.speechSynthesis.cancel(); 
-
     const utterance = new SpeechSynthesisUtterance(text);
     const customVoice = systemVoices.find(v => v.name === selectedVoiceName);
     if (customVoice) utterance.voice = customVoice;
-
+    
     switch (coachPersona) {
       case 'angry': utterance.rate = 1.25; utterance.pitch = 0.8; break;
       case 'charming': utterance.rate = 0.95; utterance.pitch = 1.1; break;
@@ -145,7 +141,9 @@ export default function App() {
     if (!engine || !batchRef.current.isActive) return;
     clearAnalysisTimeout();
     engine.postMessage(`position fen ${fenToEvaluate}`);
-    engine.postMessage('go depth 10');
+    // Use movetime to force rapid evaluation and prevent getting stuck!
+    engine.postMessage('go movetime 150');
+    
     analysisTimeoutRef.current = setTimeout(() => {
       if (!batchRef.current.isActive) return;
       handleBatchResult('');
@@ -174,7 +172,7 @@ export default function App() {
   }
 
   // ==========================================
-  // ENGINE LOGIC UNIT
+  // ENGINE INITIALIZATION
   // ==========================================
   useEffect(() => {
     fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.1/stockfish.js')
@@ -206,7 +204,6 @@ export default function App() {
           if (line.includes('bestmove')) {
             const moveLAN = line.split(' ')[1];
             
-            // FULL GAME BATCH ANALYSIS LOOP
             if (batchRef.current.isActive) {
               handleBatchResult(moveLAN);
             } 
@@ -246,7 +243,7 @@ export default function App() {
     engine.postMessage(`go depth ${Math.max(2, aiLevel + 2)}`); 
   }, [game, engine, gameMode, aiLevel, isFullGameAnalyzing]);
 
-  function handleSquareClick(square) {
+function handleSquareClick(square) {
     if (gameMode === 'review' || engineThinking || isFullGameAnalyzing) return;
     if (!moveFrom) {
       const piece = game.get(square);
@@ -284,7 +281,7 @@ export default function App() {
   }
 
   // ==========================================
-  // CHESS.COM STYLE FULL GAME BATCH ANALYSIS
+  // FAST BATCH ANALYSIS & COACH LOGIC
   // ==========================================
   function importPgn() {
     if (!pgnInput) return;
@@ -305,7 +302,6 @@ export default function App() {
         return { ...m, fenBefore, fenAfter };
       });
 
-      // Prepare queue for full game analysis
       const fenList = ["rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", ...parsedReview.map(m => m.fenAfter)];
       
       batchRef.current = { isActive: true, queue: fenList, results: [], currentScore: 0, parsedReview };
@@ -314,9 +310,7 @@ export default function App() {
       setGameMode('review');
       setGame(new Chess());
       
-      // Start the engine loop
       queueBatchPosition(fenList[0]);
-
     } catch(err) {
       alert("Invalid PGN format block.");
     }
@@ -327,7 +321,6 @@ export default function App() {
     clearAnalysisTimeout();
     setAnalysisProgress(100);
     
-    // Safety check: ensure results length matches parsedReview length
     const finalResults = results.length >= parsedReview.length + 1 ? results : [...results, ...Array(parsedReview.length + 1 - results.length).fill({score: 0, bestMove: ''})];
 
     const finalizedMoves = parsedReview.map((m, idx) => {
@@ -339,13 +332,14 @@ export default function App() {
       const delta = scoreAfter - scoreBefore;
 
       let classification = "Good";
-      if (delta < -300) classification = "Blunder";
+      if (delta < -250) classification = "Blunder";
       else if (delta < -80) classification = "Mistake";
       else if (delta < -30) classification = "Inaccuracy";
       else if (m.lan === beforeData.bestMove || delta > -10) classification = "Best Move";
-      else if (delta > 50) classification = "Great Move";
+      else if (delta > 30) classification = "Great Move";
 
-      if (idx < 6 && classification !== "Blunder" && classification !== "Mistake") classification = "Book";
+      // Forgiving opening book logic (First 8 plies are book unless terrible blunder)
+      if (idx < 8 && delta > -100) classification = "Book";
 
       return { ...m, classification, bestMoveLAN: beforeData.bestMove, delta };
     });
@@ -384,7 +378,7 @@ export default function App() {
     const isCheck = move.san.includes('+');
     
     let contextBonus = "";
-    if (isCapture) contextBonus = ` You captured a crucial piece on ${toSquare}.`;
+    if (isCapture) contextBonus = ` Capturing a crucial piece on ${toSquare} gives you a tangible edge.`;
     else if (isCheck) contextBonus = ` By delivering a sharp check on ${toSquare}, you force the opponent to react entirely on your terms.`;
 
     const pool = COACH_TEMPLATES[classification] || COACH_TEMPLATES["Good"];
@@ -399,7 +393,7 @@ export default function App() {
     if (["Blunder", "Mistake", "Inaccuracy"].includes(classification) && bestMoveLAN) {
       const altFrom = bestMoveLAN.substring(0, 2);
       const altTo = bestMoveLAN.substring(2, 4);
-      const altPhrase = `Instead, the engine screams for you to move from ${altFrom} to ${altTo}. Why? Because ${altTo} controls critical central geometry and applies undeniable pressure. Check the alternative line.`;
+      const altPhrase = `Instead, the engine recommends moving from ${altFrom} to ${altTo} to maintain the tension and keep control. Check the alternative line.`;
       dynamicText = dynamicText.replace(/{alt_phrase}/g, altPhrase);
     } else {
       dynamicText = dynamicText.replace(/{alt_phrase}/g, ""); 
@@ -477,7 +471,6 @@ export default function App() {
 
   const badgeColorMap = { "Best Move": "#4CAF50", "Great Move": "#1baca1", "Book": "#a5a5a5", "Good": "#96bc4b", "Inaccuracy": "#8c8c8c", "Mistake": "#f7c04a", "Blunder": "#b23333" };
   const currentTheme = BOARD_THEMES[boardTheme];
-
   const showAlternativeButton = !isViewingAlt && ["Blunder", "Mistake", "Inaccuracy"].includes(currentClassification);
 
   return (
@@ -554,18 +547,14 @@ export default function App() {
           </div>
 
           <div className="side-panel">
-            
-            {/* SETTINGS PANEL */}
             {gameMode === 'settings' && (
               <div>
                 <h3 style={{color: '#FF9800', margin: '0 0 15px 0'}}>Preferences</h3>
-                
                 <div className="setting-row">
                   <label><strong>AI Playing Strength</strong></label>
                   <input type="range" min="1" max="10" value={aiLevel} onChange={(e) => setAiLevel(parseInt(e.target.value))} />
                   <span style={{fontSize:'12px', color:'#aaa', textAlign: 'right'}}>Level {aiLevel}</span>
                 </div>
-
                 <div className="setting-row">
                   <label><strong>Board Aesthetic</strong></label>
                   <select value={boardTheme} onChange={(e) => setBoardTheme(e.target.value)}>
@@ -576,7 +565,6 @@ export default function App() {
                     <option value="dark">Midnight Dark</option>
                   </select>
                 </div>
-
                 <div className="setting-row">
                   <label><strong>Virtual Coach Persona</strong></label>
                   <select value={coachPersona} onChange={(e) => setCoachPersona(e.target.value)}>
@@ -586,14 +574,12 @@ export default function App() {
                     <option value="sexy">Sultry & Smooth 🎙️</option>
                   </select>
                 </div>
-
                 <div className="setting-row">
                   <label><strong>Physical Voice Device Select</strong></label>
                   <select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)}>
                     {systemVoices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
                   </select>
                 </div>
-
                 <div className="setting-row" style={{border: 'none', paddingTop: '20px'}}>
                   <button className="btn" style={{backgroundColor: isVoiceMuted ? '#4a4a4a' : '#4CAF50', width: '100%'}} onClick={() => { setIsVoiceMuted(!isVoiceMuted); window.speechSynthesis?.cancel(); }}>
                     {isVoiceMuted ? '🔇 Audio Muted' : '🔊 Audio Active'}
@@ -602,11 +588,9 @@ export default function App() {
               </div>
             )}
 
-            {/* REAL-TIME ENGINE REVIEW MODE */}
             {gameMode === 'review' && (
               <div style={{display: 'flex', flexDirection: 'column', height: '100%', flex: 1}}>
                 <h3 style={{color: '#2196F3', margin: '0 0 15px 0'}}>Match Analytics</h3>
-                
                 {reviewMoves.length === 0 && !isFullGameAnalyzing ? (
                   <div>
                     <textarea style={{width: '100%', height: '180px', background: '#161616', color: '#fff', border: '1px solid #444', padding: '12px', marginBottom: '15px', boxSizing:'border-box', borderRadius: '6px', fontFamily: 'monospace'}} placeholder="Paste Chess.com PGN notation blocks here..." value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} />
@@ -634,12 +618,10 @@ export default function App() {
                              </div>
                            )}
                         </div>
-
                         <div className="coach-box" style={{borderColor: badgeColorMap[currentClassification] || '#2196F3'}}>
                            <div style={{fontWeight: 'bold', color: badgeColorMap[currentClassification] || '#2196F3', marginBottom: '8px', fontSize: '15px'}}>♟️ Coach Insights:</div>
                            <p style={{margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#e0e0e0'}}>{coachExplanation}</p>
                         </div>
-
                         {showAlternativeButton && (
                           <button className="action-btn" style={{backgroundColor: '#1baca1', marginTop: '15px'}} onClick={showAlternativeLine}>🔍 View Recommended Move</button>
                         )}
@@ -648,7 +630,6 @@ export default function App() {
                         )}
                       </>
                     )}
-
                     <div style={{display:'flex', gap:'10px', marginTop:'auto', paddingTop: '20px'}}>
                        <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex <= 0} onClick={() => navigateReview(-1)}>← Prev</button>
                        <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === reviewMoves.length - 1} onClick={() => navigateReview(1)}>Next →</button>
@@ -658,7 +639,6 @@ export default function App() {
               </div>
             )}
 
-            {/* AI PLAY LOGS */}
             {gameMode === 'computer' && (
               <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
                 <h3 style={{margin: '0 0 15px 0', color: '#4CAF50'}}>Match Arena Logs</h3>
@@ -668,7 +648,6 @@ export default function App() {
                 </div>
               </div>
             )}
-            
           </div>
         </div>
       </div>
