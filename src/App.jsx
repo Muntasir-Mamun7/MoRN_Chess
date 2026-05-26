@@ -62,6 +62,7 @@ const COACH_TEMPLATES = {
     "A textbook opening response. The {piece} on {to} readies your army for the upcoming middlegame."
   ]
 };
+
 export default function App() {
   const [game, setGame] = useState(new Chess());
   const [engine, setEngine] = useState(null);
@@ -243,7 +244,7 @@ export default function App() {
     engine.postMessage(`go depth ${Math.max(2, aiLevel + 2)}`); 
   }, [game, engine, gameMode, aiLevel, isFullGameAnalyzing]);
 
-function handleSquareClick(square) {
+  function handleSquareClick(square) {
     if (gameMode === 'review' || engineThinking || isFullGameAnalyzing) return;
     if (!moveFrom) {
       const piece = game.get(square);
@@ -469,7 +470,7 @@ function handleSquareClick(square) {
     return bestMoveArrow;
   }, [gameMode, isViewingAlt, reviewMoves, currentReviewIndex, bestMoveArrow]);
 
-  const badgeColorMap = { "Best Move": "#4CAF50", "Great Move": "#1baca1", "Book": "#a5a5a5", "Good": "#96bc4b", "Inaccuracy": "#8c8c8c", "Mistake": "#f7c04a", "Blunder": "#b23333" };
+  const badgeColorMap = { "Best Move": "#4CAF50", "Great Move": "#1baca1", "Book": "#a5a5a5", "Good": "#96bc4b", "Inaccuracy": "#8c8c8c", "Mistake": "#f7c04a", "Blunder": "#b23333", "Analyzing...": "#555" };
   const currentTheme = BOARD_THEMES[boardTheme];
   const showAlternativeButton = !isViewingAlt && ["Blunder", "Mistake", "Inaccuracy"].includes(currentClassification);
 
@@ -614,7 +615,7 @@ function handleSquareClick(square) {
                            <h2 style={{margin: '8px 0', fontSize: '24px'}}>{isViewingAlt ? "Engine Alternative" : `Played: ${reviewMoves[currentReviewIndex]?.san}`}</h2>
                            {!isViewingAlt && (
                              <div className="badge-tag" style={{ backgroundColor: badgeColorMap[currentClassification] || '#444' }}>
-                               {currentClassification}
+                               {isReviewAnalyzing ? "Analyzing..." : currentClassification}
                              </div>
                            )}
                         </div>
