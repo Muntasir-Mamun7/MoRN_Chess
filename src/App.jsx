@@ -310,12 +310,36 @@ export default function App() {
 
       return { ...m, classification, bestMoveLAN: beforeData.bestMove, delta };
     });
+function finishBatchAnalysis() {
+    const { parsedReview, results } = batchRef.current;
+    
+    // Safety check: ensure results length matches parsedReview length
+    const finalResults = results.length === parsedReview.length ? results : [...results, ...Array(parsedReview.length - results.length).fill({score: 0, bestMove: ''})];
+
+    const finalizedMoves = parsedReview.map((m, idx) => {
+      const beforeData = finalResults[idx] || {score: 0, bestMove: ''};
+      const afterData = finalResults[idx + 1] || {score: 0, bestMove: ''};
+
+      const scoreBefore = beforeData.score;
+      const scoreAfter = -afterData.score; 
+      const delta = scoreAfter - scoreBefore;
+
+      let classification = "Good";
+      if (delta < -300) classification = "Blunder";
+      else if (delta < -80) classification = "Mistake";
+      else if (delta < -30) classification = "Inaccuracy";
+      else if (m.lan === beforeData.bestMove || delta > -10) classification = "Best Move";
+      else if (delta > 50) classification = "Great Move";
+
+      if (idx < 6 && classification !== "Blunder" && classification !== "Mistake") classification = "Book";
+
+      return { ...m, classification, bestMoveLAN: beforeData.bestMove, delta };
+    });
 
     setReviewMoves(finalizedMoves);
     setIsFullGameAnalyzing(false);
     batchRef.current.isActive = false;
     
-    // Auto-start review at Move 1
     setCurrentReviewIndex(0);
     setGame(new Chess(finalizedMoves[0].fenAfter));
     setCurrentClassification(finalizedMoves[0].classification);
