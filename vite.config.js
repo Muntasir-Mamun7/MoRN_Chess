@@ -4,6 +4,6 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // REPLACE '/open-chess/' with exactly whatever your GitHub repository name is!
-  base: '/open-chess/', 
+  // THIS EXACTLY MATCHES YOUR REPO NAME
+  base: '/MoRN_Chess/', 
 })
