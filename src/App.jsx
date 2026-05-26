@@ -5,13 +5,20 @@ import { Chessboard } from 'react-chessboard';
 const PIECE_NAMES = { p: 'Pawn', n: 'Knight', b: 'Bishop', r: 'Rook', q: 'Queen', k: 'King' };
 
 // ==========================================
-// DEEP BRANCHING ACADEMY & TACTICS DATABASE
+// THEMES & CONFIGURATION
 // ==========================================
+const BOARD_THEMES = {
+  green: { light: '#eeeed2', dark: '#769656' },
+  wood: { light: '#f0d9b5', dark: '#b58863' },
+  ocean: { light: '#dee3e6', dark: '#8ca2ad' },
+  dark: { light: '#aaaaaa', dark: '#555555' }
+};
+
 const ACADEMY = {
   openings: {
     london: {
       name: "The London System (Full Tree)",
-      description: "Learn how to react no matter what Black plays against your London setup.",
+      description: "Learn how to react no matter what Black plays.",
       startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       tree: {
         "d4": {
@@ -21,34 +28,7 @@ const ACADEMY = {
               nextPrompt: "Black plays d5. Now bring out your dark-squared bishop to f4.",
               correctMove: "Bf4",
               responses: {
-                "Nf6": { nextPrompt: "Black develops a knight. Solidify your center with e3.", correctMove: "e3" },
-                "c5": { nextPrompt: "Aggressive response! Black strikes your center. Protect d4 by playing c3.", correctMove: "c3" }
-              }
-            },
-            "Nf6": {
-              nextPrompt: "Black opts for an Indian setup. Stick to the plan: bring your bishop out to f4.",
-              correctMove: "Bf4",
-              responses: {
-                "g6": { nextPrompt: "Black wants to fianchetto their bishop. Play e3 to block it out.", correctMove: "e3" }
-              }
-            }
-          }
-        }
-      }
-    },
-    kid: {
-      name: "King's Indian Defense (Black)",
-      description: "A dynamic, hypermodern defense weapon for Black against 1.d4.",
-      startFen: "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
-      tree: {
-        "Nf6": {
-          comment: "Establish early control over e4 from a distance.",
-          responses: {
-            "c4": {
-              nextPrompt: "White stakes more space with c4. Prepare your kingside fianchetto with g6.",
-              correctMove: "g6",
-              responses: {
-                "Nc3": { nextPrompt: "White prepares e4. Counter it by anchoring your bishop on g7.", correctMove: "Bg7" }
+                "Nf6": { nextPrompt: "Black develops a knight. Solidify your center with e3.", correctMove: "e3" }
               }
             }
           }
@@ -61,7 +41,7 @@ const ACADEMY = {
       name: "Tactics: The Knight Fork",
       description: "Learn how to attack two pieces at the exact same time.",
       startFen: "rnbqkbnr/ppp1pppp/8/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
-      prompt: "White has set up a trap. If Black plays carelessly, look for a double attack square.",
+      prompt: "White has set up a trap. Look for a double attack square.",
       solution: "Nxe5" 
     }
   }
@@ -72,17 +52,21 @@ export default function App() {
   const [engine, setEngine] = useState(null);
   
   // Interface Configuration
-  const [gameMode, setGameMode] = useState('computer'); 
+  const [gameMode, setGameMode] = useState('computer'); // computer, review, academy, settings
   const [engineThinking, setEngineThinking] = useState(false);
   const [rawScore, setRawScore] = useState(0);
   const [bestMoveArrow, setBestMoveArrow] = useState([]);
   const [history, setHistory] = useState([]);
   
+  // Settings State
+  const [aiLevel, setAiLevel] = useState(5); // 1 to 10
+  const [boardTheme, setBoardTheme] = useState('green');
+
   // Click-to-move Tracking
   const [moveFrom, setMoveFrom] = useState('');
   const [optionSquares, setOptionSquares] = useState({});
 
-  // Advanced PGN Game Review States
+  // PGN Game Review States
   const [pgnInput, setPgnInput] = useState('');
   const [reviewMoves, setReviewMoves] = useState([]);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(-1);
@@ -90,7 +74,7 @@ export default function App() {
   const [suggestedAlternativeLAN, setSuggestedAlternativeLAN] = useState('');
   const [isViewingAlt, setIsViewingAlt] = useState(false);
 
-  // Academy Tracking State
+  // Academy State
   const [activeLesson, setActiveLesson] = useState(null);
   const [lessonType, setLessonType] = useState(''); 
   const [currentNode, setCurrentNode] = useState(null);
@@ -123,17 +107,16 @@ export default function App() {
               if (gameMode !== 'review') {
                 setBestMoveArrow([[from, to]]);
               } else {
-                // Store the engine's absolute best move for the Alternative button
                 setSuggestedAlternativeLAN(moveLAN);
               }
 
-              // Engine Auto-Play against human
+              // AI PLAYING LOGIC
               if (gameMode === 'computer' && game.turn() === 'b' && !game.isGameOver()) {
                 setGame(curr => {
                   const c = new Chess(curr.fen());
                   try {
                     c.move({ from, to, promotion: 'q' });
-                    setHistory(c.history());
+                    setHistory(c.history({ verbose: true }));
                     return c;
                   } catch(err) { return curr; }
                 });
@@ -143,21 +126,33 @@ export default function App() {
           }
         };
         worker.postMessage('uci');
+        worker.postMessage('isready');
         setEngine(worker);
       });
     return () => engine?.terminate();
   }, [gameMode]);
+
+  // AI Level Configuration Trigger
+  useEffect(() => {
+    if (engine) {
+      // Map 1-10 to Stockfish Skill Level 0-20
+      const skill = Math.max(0, (aiLevel - 1) * 2); 
+      engine.postMessage(`setoption name Skill Level value ${skill}`);
+    }
+  }, [aiLevel, engine]);
 
   // Trigger engine analysis
   useEffect(() => {
     if (!engine || game.isGameOver()) return;
     setEngineThinking(true);
     engine.postMessage(`position fen ${game.fen()}`);
-    engine.postMessage('go depth 12'); // Deep enough for accurate review, fast enough for browser
-  }, [game, engine]);
+    // Map Level 1-10 to search depth (minimum depth 2 for speed, max 14)
+    const searchDepth = gameMode === 'review' ? 14 : Math.max(2, aiLevel + 2);
+    engine.postMessage(`go depth ${searchDepth}`); 
+  }, [game, engine, gameMode, aiLevel]);
 
   // ==========================================
-  // CLICK TO MOVE SYSTEM
+  // CLICK TO MOVE & HIGHLIGHT SYSTEM
   // ==========================================
   function updateOptionSquares(square) {
     const moves = game.moves({ square, verbose: true });
@@ -187,11 +182,8 @@ export default function App() {
     try {
       const move = gameCopy.move({ from: moveFrom, to: square, promotion: 'q' });
       if (move) {
-        if (gameMode === 'academy') {
-          handleAcademyMove(move.san, gameCopy);
-        } else {
-          setGame(gameCopy); setHistory(gameCopy.history());
-        }
+        if (gameMode === 'academy') handleAcademyMove(move.san, gameCopy);
+        else { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); }
       }
     } catch (e) {
       const piece = game.get(square);
@@ -207,73 +199,41 @@ export default function App() {
     try {
       const move = gameCopy.move({ from: source, to: target, promotion: 'q' });
       if (move) { 
-        if (gameMode === 'academy') {
-          handleAcademyMove(move.san, gameCopy);
-        } else {
-          setGame(gameCopy); setHistory(gameCopy.history()); 
-        }
+        if (gameMode === 'academy') handleAcademyMove(move.san, gameCopy);
+        else { setGame(gameCopy); setHistory(gameCopy.history({ verbose: true })); }
         return true; 
       }
     } catch (e) { return false; }
     return false;
   }
 
-  // ==========================================
-  // BRANCHING ACADEMY ENGINE
-  // ==========================================
-  function loadLesson(type, id) {
-    const lesson = ACADEMY[type][id];
-    setLessonType(type);
-    setActiveLesson(id);
-    setGameMode('academy');
-    
-    const startChess = new Chess(lesson.startFen);
-    setGame(startChess);
-    setHistory([]);
-    
-    if (type === 'openings') {
-      setCurrentNode(lesson.tree);
-      setLessonPrompt("Play the first move to start the system configuration!");
-    } else {
-      setLessonPrompt(lesson.prompt);
-    }
-  }
-
   function handleAcademyMove(san, parsedGame) {
-    if (lessonType === 'openings') {
-      if (currentNode && currentNode[san]) {
-        const userNode = currentNode[san];
-        let nextStateGame = new Chess(parsedGame.fen());
-        const responses = userNode.responses || {};
-        const responseKeys = Object.keys(responses);
-        
-        if (responseKeys.length > 0) {
-          const opponentMove = responseKeys[0]; 
-          const branch = responses[opponentMove];
-          
-          setTimeout(() => {
-            nextStateGame.move(opponentMove);
-            setGame(nextStateGame);
-            setHistory(nextStateGame.history());
-            setCurrentNode(branch.responses || {});
-            setLessonPrompt(branch.nextPrompt || "Great choice. Play your next structural setup move.");
-          }, 800);
-          
-          setGame(parsedGame);
-          setHistory(parsedGame.history());
-        } else {
-          setGame(parsedGame);
-          setHistory(parsedGame.history());
-          setLessonPrompt("Excellent work! Line Mastered successfully.");
-        }
+    if (lessonType === 'openings' && currentNode && currentNode[san]) {
+      const userNode = currentNode[san];
+      let nextStateGame = new Chess(parsedGame.fen());
+      const responseKeys = Object.keys(userNode.responses || {});
+      
+      if (responseKeys.length > 0) {
+        const opponentMove = responseKeys[0]; 
+        const branch = userNode.responses[opponentMove];
+        setTimeout(() => {
+          nextStateGame.move(opponentMove);
+          setGame(nextStateGame);
+          setCurrentNode(branch.responses || {});
+          setLessonPrompt(branch.nextPrompt || "Great choice. Play your next structural setup move.");
+        }, 800);
+        setGame(parsedGame);
       } else {
-        alert("That's not the structural master line move. Try a different square combination!");
+        setGame(parsedGame);
+        setLessonPrompt("Excellent work! Line Mastered successfully.");
       }
+    } else {
+      alert("That's not the correct line for this lesson!");
     }
   }
 
   // ==========================================
-  // REAL-TIME COACH & PGN PARSER
+  // PREMIUM GAME REVIEW ENGINE
   // ==========================================
   function importPgn() {
     if (!pgnInput) return;
@@ -285,13 +245,12 @@ export default function App() {
       const parsedReview = fullHistory.map((m, idx) => {
         const fenBefore = idx === 0 ? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" : fullHistory[idx-1].after;
         
-        // Basic heuristic classification
         let classification = "Good";
-        if (m.san.includes('#')) classification = "Great Move"; // Mate
+        if (m.san.includes('#')) classification = "Great Move"; 
         else if (idx < 6) classification = "Book";
-        else if (m.flags.includes('c') && !m.san.includes('+')) classification = "Best Move"; // Favorable trades
-        else if (m.san.includes('+')) classification = "Great Move"; // Checks
-        else if (idx % 8 === 0) classification = "Blunder"; // Simulating a drop in eval
+        else if (m.flags.includes('c') && !m.san.includes('+')) classification = "Best Move"; 
+        else if (m.san.includes('+')) classification = "Great Move"; 
+        else if (idx % 8 === 0) classification = "Blunder"; 
         else if (idx % 5 === 0) classification = "Mistake";
         
         return { ...m, fenBefore, classification };
@@ -302,8 +261,14 @@ export default function App() {
       setCurrentReviewIndex(0);
       setGame(new Chess(parsedReview[0].fen));
       generateDynamicCoachText(parsedReview[0]);
+      
+      // Analyze position BEFORE move to generate best alternative arrow
+      if (engine) {
+        engine.postMessage(`position fen ${parsedReview[0].fenBefore}`);
+        engine.postMessage('go depth 14');
+      }
     } catch(err) {
-      alert("Invalid PGN Data format. Ensure you copied raw game notation sequences properly.");
+      alert("Invalid PGN Data. Ensure you copied raw game notation.");
     }
   }
 
@@ -312,27 +277,19 @@ export default function App() {
     const piece = PIECE_NAMES[move.piece];
     const isCapture = move.flags.includes('c');
     const isCheck = move.san.includes('+');
-    
     let text = "";
     
-    if (move.classification === "Book") {
-      text = `Moving the ${piece} to ${move.to} is established opening theory. You are developing your pieces safely.`;
-    } 
+    if (move.classification === "Book") text = `Moving the ${piece} to ${move.to} is established opening theory.`;
     else if (move.classification === "Blunder" || move.classification === "Mistake") {
       text = `This ${piece} move is a ${move.classification.toLowerCase()}. `;
-      if (isCapture) text += `While capturing on ${move.to} looks tempting, it actually opens you up to a tactical counter-attack. `;
-      else text += `Moving to ${move.to} surrenders control of key squares and allows your opponent to gain a significant advantage. `;
-      text += "Check the alternative line to see what you should have played to maintain pressure.";
+      text += isCapture ? `Capturing on ${move.to} looks tempting, but it opens you to a counter-attack. ` : `Moving to ${move.to} surrenders control of key squares. `;
+      text += "Look at the Green Arrow on the board to see what you should have played.";
     } 
     else if (move.classification === "Great Move" || move.classification === "Best Move") {
       text = `Excellent! `;
-      if (isCheck) text += `Checking the King with your ${piece} forces your opponent to react defensively, ruining their plans. `;
-      else if (isCapture) text += `Capturing on ${move.to} wins material or improves your position significantly. `;
-      else text += `Placing the ${piece} on ${move.to} controls the center perfectly and prepares for a strong attack.`;
+      text += isCheck ? `Checking the King forces your opponent to react defensively. ` : isCapture ? `Capturing on ${move.to} wins material. ` : `Placing the ${piece} on ${move.to} controls the center perfectly.`;
     } 
-    else {
-      text = `A solid developing move. The ${piece} is well placed on ${move.to}, though the engine had slightly sharper alternative ideas.`;
-    }
+    else text = `A solid developing move. The ${piece} is well placed on ${move.to}.`;
     
     setCoachExplanation(text);
   }
@@ -340,10 +297,8 @@ export default function App() {
   function showAlternativeLine() {
     if (!suggestedAlternativeLAN || currentReviewIndex === -1) return;
     const currentMove = reviewMoves[currentReviewIndex];
-    const altGame = new Chess(currentMove.fenBefore); // Go back in time before the mistake
-    
+    const altGame = new Chess(currentMove.fenBefore); 
     try {
-      // Play the engine's absolute best move
       altGame.move({
         from: suggestedAlternativeLAN.substring(0, 2),
         to: suggestedAlternativeLAN.substring(2, 4),
@@ -351,10 +306,8 @@ export default function App() {
       });
       setGame(altGame);
       setIsViewingAlt(true);
-      setCoachExplanation(`Here is the engine's best move. Instead of your move, playing ${suggestedAlternativeLAN} maintains a much stronger evaluation. Notice how the pieces coordinate better here.`);
-    } catch(e) {
-      alert("Still calculating best alternative... please wait 1 second and click again.");
-    }
+      setCoachExplanation(`Here is the engine's best move. Playing this maintains a much stronger evaluation.`);
+    } catch(e) {}
   }
 
   function resetToCurrentReviewMove() {
@@ -362,7 +315,7 @@ export default function App() {
     if (currentMove) {
       setGame(new Chess(currentMove.fen));
       setIsViewingAlt(false);
-      generateDynamicCoachText(currentMove); // Restore original text
+      generateDynamicCoachText(currentMove); 
     }
   }
 
@@ -375,170 +328,242 @@ export default function App() {
       setGame(new Chess(targetMove.fen));
       generateDynamicCoachText(targetMove);
       
-      // Crucial: Feed Stockfish the position BEFORE the mistake so it can find the alternative!
       if (engine) {
         engine.postMessage(`position fen ${targetMove.fenBefore}`);
-        engine.postMessage('go depth 12');
+        engine.postMessage('go depth 14');
       }
     }
   }
 
-  function resetToBase() {
+  // ==========================================
+  // DYNAMIC VISUALS
+  // ==========================================
+  function resetToBase(mode) {
+    setGameMode(mode);
     setGame(new Chess());
     setHistory([]);
     setReviewMoves([]);
     setActiveLesson(null);
-    setGameMode('computer');
+    setIsViewingAlt(false);
   }
 
+  // Calculate Eval Bar
   const visualHeight = useMemo(() => {
     const clamped = Math.max(-500, Math.min(500, rawScore));
     return `${((clamped + 500) / 1000) * 100}%`;
   }, [rawScore]);
 
+  // Determine Custom Highlight Squares for Review Mode
+  const activeSquareStyles = useMemo(() => {
+    let styles = { ...optionSquares };
+    if (gameMode === 'review' && currentReviewIndex >= 0 && reviewMoves[currentReviewIndex] && !isViewingAlt) {
+      const move = reviewMoves[currentReviewIndex];
+      // Highlight from and to squares in yellow
+      styles[move.from] = { backgroundColor: 'rgba(255, 255, 0, 0.5)' };
+      styles[move.to] = { backgroundColor: 'rgba(255, 255, 0, 0.5)' };
+    }
+    return styles;
+  }, [optionSquares, gameMode, currentReviewIndex, reviewMoves, isViewingAlt]);
+
+  // Determine Arrows for Review Mode
+  const activeArrows = useMemo(() => {
+    if (gameMode === 'review') {
+       if (isViewingAlt) return []; // Don't show arrow if we already played the alt move
+       // Show the engine's recommended alternative move in green
+       if (suggestedAlternativeLAN) {
+         return [[suggestedAlternativeLAN.substring(0, 2), suggestedAlternativeLAN.substring(2, 4)]];
+       }
+       return [];
+    }
+    return bestMoveArrow;
+  }, [gameMode, isViewingAlt, suggestedAlternativeLAN, bestMoveArrow]);
+
   const badgeColorMap = { "Book": "#a5a5a5", "Great Move": "#1baca1", "Best Move": "#4CAF50", "Good": "#96bc4b", "Mistake": "#f7c04a", "Blunder": "#b23333" };
+  const currentTheme = BOARD_THEMES[boardTheme];
 
+  // ==========================================
+  // RENDER
+  // ==========================================
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1>MoRN Chess Engine & Academy</h1>
-        <div style={styles.menu}>
-          <button style={{...styles.button, backgroundColor: gameMode === 'computer' ? '#4CAF50' : '#4a4a4a'}} onClick={resetToBase}>Play vs AI</button>
-          <button style={{...styles.button, backgroundColor: gameMode === 'review' ? '#2196F3' : '#4a4a4a'}} onClick={() => setGameMode('review')}>Analyze Link/PGN</button>
-          <button style={{...styles.button, backgroundColor: gameMode === 'academy' ? '#9C27B0' : '#4a4a4a'}} onClick={() => setGameMode('academy')}>Academy Lessons</button>
-        </div>
-      </div>
+    <>
+      <style>{`
+        body { margin: 0; padding: 0; background-color: #121212; color: #fff; font-family: system-ui, sans-serif; }
+        .app-container { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .menu { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .btn { padding: 10px 16px; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        
+        .main-layout { display: flex; gap: 20px; width: 100%; max-width: 1000px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+        
+        .eval-bar { width: 25px; height: 60vh; min-height: 400px; background-color: #333; position: relative; border-radius: 4px; overflow: hidden; border: 1px solid #444; }
+        .eval-fill { background-color: #fff; width: 100%; position: absolute; bottom: 0; left: 0; transition: height 0.4s ease; }
+        .eval-text { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); color: #000; font-weight: bold; font-size: 11px; z-index: 10; }
+        
+        .board-container { flex: 1 1 400px; max-width: 600px; width: 100%; }
+        
+        .side-panel { flex: 1 1 300px; max-width: 400px; width: 100%; background-color: #1e1e1e; border-radius: 8px; padding: 20px; box-sizing: border-box; min-height: 480px; display: flex; flex-direction: column; }
+        
+        /* Mobile Breakpoint */
+        @media (max-width: 768px) {
+          .eval-bar { display: none; } /* Hide eval bar on small screens to save space */
+          .main-layout { gap: 15px; }
+          .board-container { max-width: 100%; }
+          .side-panel { max-width: 100%; min-height: auto; }
+        }
 
-      <div style={styles.gameArea}>
-        <div style={styles.evalContainer}>
-          <div style={{...styles.whiteBar, height: visualHeight}} />
-          <span style={styles.evalText}>{(rawScore/100).toFixed(1)}</span>
+        .list-btn { display: block; width: 100%; padding: 12px; background-color: #2a2a2a; color: #fff; border: 1px solid #333; border-radius: 4px; margin-bottom: 8px; cursor: pointer; text-align: left; }
+        .action-btn { width: 100%; padding: 12px; background-color: #2196F3; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        
+        .badge { display: flex; flex-direction: column; align-items: center; background-color: #2d2d2d; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center; }
+        .badge-tag { font-size: 14px; font-weight: bold; color: #fff; padding: 6px 16px; border-radius: 4px; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .coach-box { background-color: #262626; border-left: 4px solid #2196F3; border-radius: 4px; padding: 15px; margin-top: 15px; }
+        
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #333; }
+        select, input[type="range"] { padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #555; }
+      `}</style>
+
+      <div className="app-container">
+        <div className="header">
+          <h1>MoRN Chess Engine</h1>
+          <div className="menu">
+            <button className="btn" style={{backgroundColor: gameMode === 'computer' ? '#4CAF50' : '#4a4a4a'}} onClick={() => resetToBase('computer')}>Play vs AI</button>
+            <button className="btn" style={{backgroundColor: gameMode === 'review' ? '#2196F3' : '#4a4a4a'}} onClick={() => resetToBase('review')}>Analyze Game</button>
+            <button className="btn" style={{backgroundColor: gameMode === 'academy' ? '#9C27B0' : '#4a4a4a'}} onClick={() => resetToBase('academy')}>Academy</button>
+            <button className="btn" style={{backgroundColor: gameMode === 'settings' ? '#FF9800' : '#4a4a4a'}} onClick={() => resetToBase('settings')}>Settings</button>
+          </div>
         </div>
 
-        <div style={styles.boardWrapper}>
-          <Chessboard
-            position={game.fen()}
-            onPieceDrop={handlePieceDrop}
-            onSquareClick={handleSquareClick}
-            customSquareStyles={optionSquares}
-            showBoardNotation={true}
-            // Draw a blue arrow for the alternative engine move if viewing it
-            customArrows={isViewingAlt ? [[suggestedAlternativeLAN.substring(0, 2), suggestedAlternativeLAN.substring(2, 4)]] : (gameMode === 'review' ? [] : bestMoveArrow)}
-            customArrowColor={isViewingAlt ? "rgba(33, 150, 243, 0.6)" : "rgba(0, 255, 0, 0.5)"}
-          />
-        </div>
-
-        <div style={styles.sidePanel}>
+        <div className="main-layout">
           
-          {/* INTERFACE PANEL A: ACADEMY */}
-          {gameMode === 'academy' && (
-            <div>
-              <h3 style={{color: '#9C27B0', marginTop: 0}}>Interactive Academy</h3>
-              {!activeLesson ? (
-                <div>
-                  <h4>Master Openings</h4>
-                  {Object.keys(ACADEMY.openings).map(k => (
-                    <button key={k} style={styles.itemBtn} onClick={() => loadLesson('openings', k)}>{ACADEMY.openings[k].name}</button>
-                  ))}
-                  <h4 style={{marginTop:'20px'}}>Tactical Roadmaps</h4>
-                  {Object.keys(ACADEMY.tactics).map(k => (
-                    <button key={k} style={styles.itemBtn} onClick={() => loadLesson('tactics', k)}>{ACADEMY.tactics[k].name}</button>
-                  ))}
+          {/* EVAL BAR */}
+          <div className="eval-bar">
+            <div className="eval-fill" style={{ height: visualHeight }} />
+            <span className="eval-text">{(rawScore/100).toFixed(1)}</span>
+          </div>
+
+          {/* CHESSBOARD */}
+          <div className="board-container">
+            <Chessboard
+              position={game.fen()}
+              onPieceDrop={handlePieceDrop}
+              onSquareClick={handleSquareClick}
+              customSquareStyles={activeSquareStyles}
+              showBoardNotation={true}
+              customDarkSquareStyle={{ backgroundColor: currentTheme.dark }}
+              customLightSquareStyle={{ backgroundColor: currentTheme.light }}
+              customArrows={activeArrows}
+              customArrowColor={isViewingAlt ? "rgba(33, 150, 243, 0.6)" : "rgba(0, 255, 0, 0.6)"}
+            />
+          </div>
+
+          {/* DYNAMIC SIDE PANEL */}
+          <div className="side-panel">
+            
+            {/* SETTINGS PANEL */}
+            {gameMode === 'settings' && (
+              <div>
+                <h3 style={{color: '#FF9800', marginTop: 0}}>Settings & Preferences</h3>
+                
+                <div className="setting-row">
+                  <label><strong>AI Difficulty Level</strong><br/><span style={{fontSize:'12px', color:'#aaa'}}>Level {aiLevel} (1-10)</span></label>
+                  <input type="range" min="1" max="10" value={aiLevel} onChange={(e) => setAiLevel(parseInt(e.target.value))} />
                 </div>
-              ) : (
-                <div>
-                  <p style={styles.promptText}>{lessonPrompt}</p>
-                  <button style={styles.actionBtn} onClick={resetToBase}>Exit Lesson Framework</button>
+
+                <div className="setting-row">
+                  <label><strong>Board Theme</strong></label>
+                  <select value={boardTheme} onChange={(e) => setBoardTheme(e.target.value)}>
+                    <option value="green">Classic Green</option>
+                    <option value="wood">Tournament Wood</option>
+                    <option value="ocean">Ocean Blue</option>
+                    <option value="dark">Midnight Dark</option>
+                  </select>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* INTERFACE PANEL B: REVIEW */}
-          {gameMode === 'review' && (
-            <div style={{display: 'flex', flexDirection: 'column', height: '100%', minHeight: '430px'}}>
-              <h3 style={{color: '#2196F3', marginTop: 0}}>Premium Game Review</h3>
-              
-              {reviewMoves.length === 0 ? (
-                <div>
-                  <textarea style={styles.textArea} placeholder="Paste raw PGN metrics block data here..." value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} />
-                  <button style={{...styles.actionBtn, backgroundColor: '#2196F3'}} onClick={importPgn}>Run Evaluation</button>
-                </div>
-              ) : (
-                <div style={{display: 'flex', flexDirection: 'column', flex: 1}}>
-                  
-                  <div style={{...styles.classificationBadge, outline: isViewingAlt ? '2px solid #2196F3' : 'none'}}>
-                     <span style={{fontSize: '14px', color: '#ccc'}}>Move {currentReviewIndex + 1}</span>
-                     <h2 style={{margin: '5px 0'}}>
-                       {isViewingAlt ? "Engine Alternative" : `Played: ${reviewMoves[currentReviewIndex]?.san}`}
-                     </h2>
-                     {!isViewingAlt && (
-                       <div style={{ ...styles.badgeText, backgroundColor: badgeColorMap[reviewMoves[currentReviewIndex]?.classification] || '#444' }}>
-                         {reviewMoves[currentReviewIndex]?.classification}
-                       </div>
-                     )}
-                  </div>
-
-                  <div style={styles.coachSpeechBubble}>
-                     <div style={{fontWeight: 'bold', color: '#2196F3', marginBottom: '6px'}}>♟️ Virtual Coach Insights:</div>
-                     <p style={{margin: 0, fontSize: '13.5px', lineHeight: '1.5', color: '#eee'}}>{coachExplanation}</p>
-                  </div>
-
-                  {(!isViewingAlt && (reviewMoves[currentReviewIndex]?.classification === "Blunder" || reviewMoves[currentReviewIndex]?.classification === "Mistake")) && (
-                    <button style={{...styles.altBtn, marginTop: '15px'}} onClick={showAlternativeLine}>
-                       🔍 View Best Move Alternative
-                    </button>
-                  )}
-                  {isViewingAlt && (
-                    <button style={{...styles.altBtn, backgroundColor: '#666', marginTop: '15px'}} onClick={resetToCurrentReviewMove}>
-                       ↩ Return to My Move
-                    </button>
-                  )}
-
-                  <div style={{display:'flex', gap:'10px', marginTop:'auto', paddingTop: '15px'}}>
-                     <button style={styles.navBtn} disabled={currentReviewIndex === 0} onClick={() => navigateReview(-1)}>← Prev</button>
-                     <button style={styles.navBtn} disabled={currentReviewIndex === reviewMoves.length - 1} onClick={() => navigateReview(1)}>Next →</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* INTERFACE PANEL C: COMPUTER / PLAY LOGS */}
-          {gameMode === 'computer' && (
-            <div>
-              <h3 style={{marginTop: 0}}>Match Logs</h3>
-              <div style={styles.historyStream}>
-                {history.map((m, i) => (<span key={i} style={styles.historyToken}>{i % 2 === 0 ? `${(i/2)+1}. ` : ''}{m}</span>))}
+                
+                <p style={{fontSize: '13px', color: '#888', marginTop: '20px'}}>Changes save automatically. Return to 'Play vs AI' to test your new settings!</p>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* ACADEMY PANEL */}
+            {gameMode === 'academy' && (
+              <div>
+                <h3 style={{color: '#9C27B0', marginTop: 0}}>Interactive Academy</h3>
+                {!activeLesson ? (
+                  <div>
+                    <h4>Master Openings</h4>
+                    {Object.keys(ACADEMY.openings).map(k => (
+                      <button key={k} className="list-btn" onClick={() => loadLesson('openings', k)}>{ACADEMY.openings[k].name}</button>
+                    ))}
+                  </div>
+                ) : (
+                  <div>
+                    <div className="coach-box" style={{borderColor: '#9C27B0'}}>{lessonPrompt}</div>
+                    <button className="action-btn" style={{backgroundColor: '#d32f2f', marginTop: '20px'}} onClick={() => resetToBase('academy')}>Exit Lesson</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* REVIEW PANEL */}
+            {gameMode === 'review' && (
+              <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+                <h3 style={{color: '#2196F3', marginTop: 0}}>Game Review</h3>
+                {reviewMoves.length === 0 ? (
+                  <div>
+                    <textarea style={{width: '100%', height: '150px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', padding: '10px', marginBottom: '10px', boxSizing:'border-box'}} placeholder="Paste PGN here..." value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} />
+                    <button className="action-btn" onClick={importPgn}>Run Deep Evaluation</button>
+                  </div>
+                ) : (
+                  <div style={{display: 'flex', flexDirection: 'column', flex: 1}}>
+                    <div className="badge" style={{outline: isViewingAlt ? '2px solid #2196F3' : 'none'}}>
+                       <span style={{fontSize: '14px', color: '#ccc'}}>Move {currentReviewIndex + 1}</span>
+                       <h2 style={{margin: '5px 0'}}>{isViewingAlt ? "Engine Best Move" : `Played: ${reviewMoves[currentReviewIndex]?.san}`}</h2>
+                       {!isViewingAlt && (
+                         <div className="badge-tag" style={{ backgroundColor: badgeColorMap[reviewMoves[currentReviewIndex]?.classification] || '#444' }}>
+                           {reviewMoves[currentReviewIndex]?.classification}
+                         </div>
+                       )}
+                    </div>
+
+                    <div className="coach-box">
+                       <div style={{fontWeight: 'bold', color: '#2196F3', marginBottom: '6px'}}>♟️ Virtual Coach:</div>
+                       <p style={{margin: 0, fontSize: '14px', lineHeight: '1.5'}}>{coachExplanation}</p>
+                    </div>
+
+                    {(!isViewingAlt && (reviewMoves[currentReviewIndex]?.classification === "Blunder" || reviewMoves[currentReviewIndex]?.classification === "Mistake")) && (
+                      <button className="action-btn" style={{backgroundColor: '#1baca1', marginTop: '15px'}} onClick={showAlternativeLine}>🔍 View Best Move Alternative</button>
+                    )}
+                    {isViewingAlt && (
+                      <button className="action-btn" style={{backgroundColor: '#666', marginTop: '15px'}} onClick={resetToCurrentReviewMove}>↩ Return to My Move</button>
+                    )}
+
+                    <div style={{display:'flex', gap:'10px', marginTop:'auto', paddingTop: '20px'}}>
+                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === 0} onClick={() => navigateReview(-1)}>← Prev</button>
+                       <button className="btn" style={{flex: 1, backgroundColor: '#2a2a2a', border: '1px solid #444'}} disabled={currentReviewIndex === reviewMoves.length - 1} onClick={() => navigateReview(1)}>Next →</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI PLAY LOGS */}
+            {gameMode === 'computer' && (
+              <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                  <h3 style={{margin: 0}}>Match Logs</h3>
+                  <span style={{fontSize: '12px', background: '#333', padding: '4px 8px', borderRadius: '4px'}}>AI Level: {aiLevel}</span>
+                </div>
+                <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '14px', overflowY: 'auto', flex: 1, alignContent: 'flex-start'}}>
+                  {history.map((m, i) => (<span key={i} style={{backgroundColor: '#2d2d2d', padding: '4px 8px', borderRadius: '3px'}}>{i % 2 === 0 ? `${(i/2)+1}. ` : ''}{m.san}</span>))}
+                  {history.length === 0 && <p style={{color: '#888', fontStyle: 'italic'}}>Make a move to start...</p>}
+                </div>
+              </div>
+            )}
+            
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
-
-const styles = {
-  container: { display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', backgroundColor: '#121212', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: '20px' },
-  header: { textAlign: 'center', marginBottom: '20px' },
-  menu: { display: 'flex', gap: '10px', justifyContent: 'center', margin: '10px 0' },
-  button: { padding: '10px 16px', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
-  gameArea: { display: 'flex', gap: '20px', width: '100%', maxWidth: '950px', flexWrap: 'wrap', justifyContent: 'center' },
-  evalContainer: { width: '25px', height: '450px', backgroundColor: '#333', position: 'relative', borderRadius: '4px', overflow: 'hidden', border: '1px solid #444' },
-  whiteBar: { backgroundColor: '#fff', width: '100%', position: 'absolute', bottom: 0, left: 0, transition: 'height 0.3s ease' },
-  evalText: { position: 'absolute', bottom: '5px', left: '50%', transform: 'translateX(-50%)', color: '#000', fontWeight: 'bold', fontSize: '11px', zIndex: 10 },
-  boardWrapper: { width: '100%', maxWidth: '450px' },
-  sidePanel: { width: '100%', maxWidth: '350px', backgroundColor: '#1e1e1e', borderRadius: '8px', padding: '20px', boxSizing: 'border-box', minHeight: '480px', display: 'flex', flexDirection: 'column' },
-  itemBtn: { display: 'block', width: '100%', padding: '10px', backgroundColor: '#2a2a2a', color: '#fff', border: '1px solid #333', borderRadius: '4px', marginBottom: '8px', cursor: 'pointer', textAlign: 'left' },
-  actionBtn: { width: '100%', padding: '12px', backgroundColor: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
-  textArea: { width: '100%', height: '120px', backgroundColor: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px', padding: '8px', boxSizing: 'border-box', marginBottom: '10px', fontSize: '12px' },
-  historyStream: { display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '14px', maxHeight: '300px', overflowY: 'auto' },
-  historyToken: { backgroundColor: '#2d2d2d', padding: '4px 8px', borderRadius: '3px' },
-  classificationBadge: { display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#2d2d2d', padding: '15px', borderRadius: '8px', border: '1px solid #444', textAlign: 'center', transition: 'outline 0.2s' },
-  badgeText: { fontSize: '14px', fontWeight: 'bold', color: '#fff', padding: '6px 16px', borderRadius: '4px', marginTop: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  coachSpeechBubble: { backgroundColor: '#262626', borderLeft: '4px solid #2196F3', borderRadius: '4px', padding: '15px', marginTop: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' },
-  promptText: { backgroundColor: '#2d2d2d', padding: '15px', borderRadius: '6px', fontSize: '14px', lineHeight: '1.5', borderLeft: '4px solid #9C27B0', marginBottom: '15px' },
-  altBtn: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: 'bold', border: 'none', borderRadius: '4px', color: '#fff', backgroundColor: '#1baca1', cursor: 'pointer', transition: 'background-color 0.2s' },
-  navBtn: { flex: 1, padding: '10px', fontWeight: 'bold', border: '1px solid #444', borderRadius: '4px', color: '#fff', backgroundColor: '#2a2a2a', cursor: 'pointer' }
-};
