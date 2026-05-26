@@ -12,52 +12,51 @@ const BOARD_THEMES = {
   portugal: { light: '#f4f4f4', dark: '#d32f2f' }
 };
 
-// ==========================================
-// EDUCATIONAL & SASSY CHESS MASTER TEMPLATES
-// ==========================================
+const ANALYSIS_STEP_TIMEOUT_MS = 5000;
+
 const COACH_TEMPLATES = {
   Blunder: [
-    "Wake up! Moving the {piece} to {to} is a complete hallucination. You just hung a massive tactical weakness. {alt_phrase}",
-    "Ouch. Did your finger slip? Playing the {piece} to {to} drops the evaluation bar into the abyss. You completely ignored the board's tension. {alt_phrase}",
-    "Absolutely not. Are we playing checkers? The {piece} on {to} walks right into a nightmare. Your opponent is definitely thanking you. {alt_phrase}",
+    "Ouch! Moving the {piece} to {to} gives up a lot of ground. In chess, we call this a blunder because it hangs material or overlooks a major threat. {alt_phrase}",
+    "Even Grandmasters make mistakes, but the {piece} to {to} is definitely one to learn from. You completely ignored the board's tension. {alt_phrase}",
+    "Did your finger slip? Playing the {piece} to {to} drops the evaluation bar into the abyss. {alt_phrase}",
     "A tragic blunder! You severed your own piece coordination. Moving the {piece} to {to} neglects your defense completely. {alt_phrase}",
-    "My silicon brain hurts looking at this. The {piece} to {to} is an absolute disaster. You're bleeding material. {alt_phrase}"
+    "My silicon brain hurts looking at this. The {piece} to {to} throws away your hard-earned advantage. {alt_phrase}"
   ],
   Mistake: [
-    "Not the right idea at all. The {piece} on {to} looks active, but it actually surrenders the positional advantage and loses crucial tempo. {alt_phrase}",
+    "Not the most accurate plan. The {piece} on {to} looks okay at a glance, but it actually surrenders your positional advantage and loses tempo. {alt_phrase}",
     "A strategic misstep. By playing the {piece} to {to}, you allowed your opponent to improve their setup without breaking a sweat. {alt_phrase}",
-    "You're drifting. Moving the {piece} to {to} is way too passive and bites on granite. It hands central control back to the enemy. {alt_phrase}",
-    "A clear mistake. The {piece} on {to} creates a structural weakness that will haunt you for the rest of the game. {alt_phrase}"
+    "You're drifting a bit here. Moving the {piece} to {to} is too passive. It hands the central control back to the enemy. {alt_phrase}",
+    "A clear mistake. The {piece} on {to} creates a structural weakness that your opponent can use as a target later. {alt_phrase}"
   ],
   Inaccuracy: [
-    "A minor inaccuracy. The {piece} to {to} is playable, but you missed a golden chance to seize the initiative by the throat. {alt_phrase}",
-    "Slightly passive. You moved the {piece} to {to}, which defends well enough, but there was a much sharper continuation. {alt_phrase}",
+    "A slight inaccuracy. Moving the {piece} to {to} is playable, but it lets your opponent off the hook. {alt_phrase}",
+    "Slightly passive play. You moved the {piece} to {to}, which defends well enough, but there was a much sharper continuation. {alt_phrase}",
     "Not the most precise choice. The {piece} on {to} allows the opponent to equalize the position a bit too easily. {alt_phrase}",
-    "It's okay, but just okay. Committing the {piece} to {to} this early releases the tension. The engine wanted more aggression. {alt_phrase}"
+    "It's okay, but just okay. Committing the {piece} to {to} this early releases the tension. The engine wanted more pressure. {alt_phrase}"
   ],
   Good: [
-    "Solid, fundamental chess. The {piece} to {to} improves your coordination and fights for central control. No need to complicate things here.",
+    "Solid, fundamental chess. The {piece} to {to} improves your coordination and fights for central control. No need to overcomplicate things here.",
     "A reliable positional choice. Placing the {piece} on {to} asks a tough question of your opponent while keeping your structure rock solid.",
     "Good development. The {piece} on {to} eyes critical squares and prepares your forces for the transition into the attack.",
-    "A very sound prophylactic move. Moving the {piece} to {to} stops their immediate counterplay and keeps you completely safe.",
+    "A very sound prophylactic move. Moving the {piece} to {to} stops their immediate counterplay and keeps your King safe.",
     "Good, sensible play. You activated the {piece} to {to} safely, keeping the tension high and your options open."
   ],
   "Great Move": [
-    "Boom! Brilliant vision. Moving the {piece} to {to} exploits a massive tactical vulnerability in their camp. The pressure is suffocating!",
+    "Excellent vision! The {piece} on {to} applies massive pressure and forces your opponent into a tight defensive spot.",
     "Great move! The {piece} on {to} completely shifts the positional balance in your favor. You are dominating the board geometry.",
     "An incredibly strong tactical decision. Placing the {piece} on {to} creates unanswerable threats. Masterful execution.",
     "Fantastic foresight. The {piece} to {to} paralyzes their defense and perfectly aligns with your attacking vectors."
   ],
   "Best Move": [
-    "Magnus Carlsen, is that you? The {piece} to {to} is the absolute best engine move. Flawless tactical execution.",
+    "Spot on! The {piece} to {to} is exactly what the engine wanted. You saw the board like a Grandmaster here.",
     "Engine approved! Placing the {piece} on {to} destroys their counterplay and secures a massive, undeniable advantage.",
     "Chess perfection. The {piece} to {to} is the only move that maintains the winning edge. Beautifully calculated.",
-    "Absolute precision. Playing the {piece} to {to} demonstrates deep strategic mastery. You saw exactly what the position demanded."
+    "Absolute precision. Playing the {piece} to {to} demonstrates deep strategic mastery. You found the absolute best continuation."
   ],
   Book: [
-    "This is deep opening preparation. The {piece} to {to} follows established Grandmaster theory.",
-    "Standard theoretical lines. Moving the {piece} to {to} secures your share of the center and develops harmoniously.",
-    "A textbook opening response. The {piece} on {to} prepares your king for safety and readies your army for the middlegame."
+    "Standard opening theory. The {piece} to {to} establishes your presence in the center and develops smoothly.",
+    "Following established Grandmaster theory. Moving the {piece} to {to} secures your share of the board.",
+    "A textbook opening response. The {piece} on {to} readies your army for the upcoming middlegame."
   ]
 };
 
@@ -86,14 +85,14 @@ export default function App() {
   const [currentReviewIndex, setCurrentReviewIndex] = useState(-1);
   const [coachExplanation, setCoachExplanation] = useState('');
   const [isViewingAlt, setIsViewingAlt] = useState(false);
-  
+  const [boardAnimationSpeed, setBoardAnimationSpeed] = useState(250);
+
   const [isFullGameAnalyzing, setIsFullGameAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
 
-  // Background Worker Refs
   const batchRef = useRef({ isActive: false, queue: [], results: [], currentScore: 0, parsedReview: [] });
+  const analysisTimeoutRef = useRef(null);
 
-  // Load browser voices
   useEffect(() => {
     if (!window.speechSynthesis) return;
     const loadVoices = () => {
@@ -111,7 +110,7 @@ export default function App() {
     const utterance = new SpeechSynthesisUtterance(text);
     const customVoice = systemVoices.find(v => v.name === selectedVoiceName);
     if (customVoice) utterance.voice = customVoice;
-
+    
     switch (coachPersona) {
       case 'angry': utterance.rate = 1.25; utterance.pitch = 0.8; break;
       case 'charming': utterance.rate = 0.95; utterance.pitch = 1.1; break;
@@ -121,9 +120,46 @@ export default function App() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // ==========================================
-  // FAST SINGLE-PASS ENGINE LOGIC
-  // ==========================================
+  function clearAnalysisTimeout() {
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
+  }
+
+  function queueBatchPosition(fenToEvaluate) {
+    if (!engine || !batchRef.current.isActive) return;
+    clearAnalysisTimeout();
+    engine.postMessage(`position fen ${fenToEvaluate}`);
+    engine.postMessage('go movetime 150');
+    
+    analysisTimeoutRef.current = setTimeout(() => {
+      if (!batchRef.current.isActive) return;
+      handleBatchResult('');
+    }, ANALYSIS_STEP_TIMEOUT_MS);
+  }
+
+  function handleBatchResult(moveLAN = '') {
+    if (!batchRef.current.isActive) return;
+    clearAnalysisTimeout();
+
+    batchRef.current.results.push({
+      score: batchRef.current.currentScore,
+      bestMove: moveLAN && moveLAN !== '(none)' ? moveLAN : ''
+    });
+
+    const total = batchRef.current.queue.length || 1;
+    const completed = batchRef.current.results.length;
+    setAnalysisProgress((completed / total) * 100);
+
+    if (completed < total) {
+      const nextFen = batchRef.current.queue[completed];
+      queueBatchPosition(nextFen);
+    } else {
+      finishBatchAnalysis();
+    }
+  }
+
   useEffect(() => {
     fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.1/stockfish.js')
       .then(res => res.text())
@@ -146,8 +182,7 @@ export default function App() {
           if (line.includes('info') && line.includes('score mate')) {
             const match = line.match(/score mate (-?\d+)/);
             if (match) {
-              const movesToMate = parseInt(match[1]);
-              const score = movesToMate > 0 ? 30000 - movesToMate : -30000 - movesToMate;
+              const score = parseInt(match[1]) > 0 ? 2500 : -2500;
               if (batchRef.current.isActive) batchRef.current.currentScore = score;
             }
           }
@@ -156,21 +191,7 @@ export default function App() {
             const moveLAN = line.split(' ')[1];
             
             if (batchRef.current.isActive) {
-              batchRef.current.results.push({
-                score: batchRef.current.currentScore,
-                bestMove: moveLAN && moveLAN !== '(none)' ? moveLAN : ''
-              });
-
-              const completed = batchRef.current.results.length;
-              const total = batchRef.current.queue.length;
-              setAnalysisProgress((completed / total) * 100);
-
-              if (completed < total) {
-                worker.postMessage(`position fen ${batchRef.current.queue[completed]}`);
-                worker.postMessage('go movetime 100'); // Ultra-fast 0.1s analysis per ply
-              } else {
-                finishBatchAnalysis();
-              }
+              handleBatchResult(moveLAN);
             } 
             else if (moveLAN && moveLAN !== '(none)') {
               const from = moveLAN.substring(0, 2);
@@ -191,7 +212,11 @@ export default function App() {
         worker.postMessage('uci');
         setEngine(worker);
       });
-    return () => engine?.terminate();
+    return () => {
+      clearAnalysisTimeout();
+      engine?.terminate();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameMode, game]);
 
   useEffect(() => {
@@ -242,9 +267,6 @@ export default function App() {
     setOptionSquares(squares);
   }
 
-  // ==========================================
-  // NON-BLOCKING BACKGROUND GAME REVIEW
-  // ==========================================
   function importPgn() {
     if (!pgnInput) return;
     if (!engine) { alert("Engine is loading. Please wait."); return; }
@@ -261,7 +283,6 @@ export default function App() {
         return { ...m, fenBefore, fenAfter, classification: null };
       });
 
-      // Prepare queue: Initial position + every position after a move
       const fenList = ["rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", ...parsedReview.map(m => m.fenAfter)];
       
       batchRef.current = { isActive: true, queue: fenList, results: [], currentScore: 0, parsedReview };
@@ -269,21 +290,20 @@ export default function App() {
       setAnalysisProgress(0);
       setGameMode('review');
       
-      // Instantly show the user Move 1 without waiting for full analysis
       setReviewMoves(parsedReview);
       setCurrentReviewIndex(0);
       setGame(new Chess(parsedReview[0].fenAfter));
       setCoachExplanation("The engine is currently calculating the variations for this game in the background. Sit tight for a few seconds!");
 
-      engine.postMessage(`position fen ${fenList[0]}`);
-      engine.postMessage('go movetime 100');
+      queueBatchPosition(fenList[0]);
     } catch(err) { alert("Invalid PGN block."); }
   }
 
   function finishBatchAnalysis() {
     const { parsedReview, results } = batchRef.current;
+    clearAnalysisTimeout();
+    setAnalysisProgress(100);
     
-    // Safety check map
     const finalResults = results.length >= parsedReview.length + 1 ? results : [...results, ...Array(parsedReview.length + 1 - results.length).fill({score: 0, bestMove: ''})];
 
     const finalizedMoves = parsedReview.map((m, idx) => {
@@ -291,7 +311,7 @@ export default function App() {
       const afterData = finalResults[idx + 1] || {score: 0, bestMove: ''};
 
       const scoreBefore = beforeData.score;
-      const scoreAfter = -afterData.score; // Invert perspective
+      const scoreAfter = -afterData.score; 
       const delta = scoreAfter - scoreBefore;
 
       let classification = "Good";
@@ -310,7 +330,6 @@ export default function App() {
     setIsFullGameAnalyzing(false);
     batchRef.current.isActive = false;
     
-    // If the user is currently viewing a move, trigger the coach speech now that it's ready
     setCurrentReviewIndex(currIdx => {
       const safeIdx = currIdx >= 0 ? currIdx : 0;
       const currentMove = finalizedMoves[safeIdx];
@@ -321,6 +340,7 @@ export default function App() {
 
   function navigateReview(direction) {
     setIsViewingAlt(false);
+    setBoardAnimationSpeed(250);
     const newIdx = currentReviewIndex + direction;
     if (newIdx >= 0 && newIdx < reviewMoves.length) {
       setCurrentReviewIndex(newIdx);
@@ -372,6 +392,7 @@ export default function App() {
     
     const altGame = new Chess(currentMove.fenBefore); 
     try {
+      setBoardAnimationSpeed(0); 
       altGame.move({ from: currentMove.bestMoveLAN.substring(0, 2), to: currentMove.bestMoveLAN.substring(2, 4), promotion: 'q' });
       setGame(altGame);
       setIsViewingAlt(true);
@@ -384,6 +405,7 @@ export default function App() {
   function resetToCurrentReviewMove() {
     const move = reviewMoves[currentReviewIndex];
     if (move) {
+      setBoardAnimationSpeed(0); 
       setGame(new Chess(move.fenAfter));
       setIsViewingAlt(false);
       compileDeepCoachReport(move, move.classification, move.bestMoveLAN); 
@@ -391,6 +413,7 @@ export default function App() {
   }
 
   function resetToBase(mode) {
+    clearAnalysisTimeout();
     batchRef.current.isActive = false;
     setGameMode(mode);
     setGame(new Chess());
@@ -469,6 +492,9 @@ export default function App() {
         select, input[type="range"] { padding: 12px; border-radius: 6px; background: #333; color: white; border: 1px solid #555; width: 100%; box-sizing: border-box; font-size: 14px; outline: none; }
         select:focus { border-color: #d32f2f; }
         
+        .progress-bar { width: 100%; height: 20px; background-color: #333; border-radius: 10px; overflow: hidden; margin-top: 20px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #2196F3, #9C27B0); transition: width 0.3s ease; }
+
         .footer { text-align: center; padding: 20px; background-color: #161616; border-top: 1px solid #2a2a2a; color: #888; font-size: 13px; width: 100%; box-sizing: border-box; }
         .footer span { color: #d32f2f; font-weight: bold; }
       `}</style>
@@ -500,7 +526,7 @@ export default function App() {
               customLightSquareStyle={{ backgroundColor: currentTheme.light }}
               customArrows={activeArrows}
               customArrowColor={isViewingAlt ? "rgba(33, 150, 243, 0.8)" : "rgba(76, 175, 80, 0.8)"}
-              animationDuration={250}
+              animationDuration={boardAnimationSpeed}
             />
           </div>
 
