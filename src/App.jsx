@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 
@@ -10,7 +10,8 @@ const PIECE_NAMES = { p: 'Pawn', n: 'Knight', b: 'Bishop', r: 'Rook', q: 'Queen'
 const COLORS = {
   Brilliant: "#1baca1", Great: "#5c8bb0", Best: "#81b64c", Excellent: "#96bc4b",
   Good: "#96bc4b", Book: "#a5a5a5", Inaccuracy: "#f0c15c", Mistake: "#e58f2a",
-  Blunder: "#ca3431", Miss: "#ff7769", Default: "#312e2b"
+  Blunder: "#ca3431", Miss: "#ff7769", Default: "#312e2b",
+  White: "#ffffff", Black: "#000000"
 };
 
 const ICONS = {
@@ -20,56 +21,88 @@ const ICONS = {
 };
 
 // ==========================================
-// CHESS.COM CAPS v2 ACCURACY ALGORITHM
+// CAPS2 WIN PROBABILITY ALGORITHM
 // ==========================================
-// 1. Convert raw engine Centipawns (cp) to Expected Win Percentage (0 to 100)
+// Converts Centipawns (from White's perspective) to Expected Win Percentage for White
 function cpToWinProb(cp) {
-  // Using the standard logistic curve parameter: 0.00368208
   return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
 }
 
-// 2. Classify move based on Win Probability Loss
-function classifyMove(cpBefore, cpAfter, isBook) {
-  if (isBook) return "Book";
-  
-  const wpBefore = cpToWinProb(cpBefore);
-  const wpAfter = cpToWinProb(cpAfter);
-  const loss = Math.max(0, wpBefore - wpAfter);
-
-  if (loss <= 2) return "Best Move";
-  if (loss <= 5) return "Excellent";
-  if (loss <= 10) return "Good";
-  if (loss <= 20) return "Inaccuracy";
-  if (loss <= 30) return "Mistake";
-  return "Blunder";
-}
-
-// 3. Calculate Overall Accuracy (0 - 100)
-function calculateAccuracy(winProbBefore, winProbAfter) {
-  const diff = Math.max(0, winProbBefore - winProbAfter);
+// Calculates 0-100 Accuracy based on Win Prob difference
+function calculateAccuracy(wpBefore, wpAfter) {
+  const diff = Math.max(0, wpBefore - wpAfter);
   let accuracy = 103.1668 * Math.exp(-0.04354 * diff) - 3.1669;
   return Math.max(0, Math.min(100, accuracy));
 }
 
+// Classify move based on Win Probability Loss
+function classifyMove(wpBefore, wpAfter, isBook, isMate) {
+  if (isMate) return "Best"; // Mates are best
+  if (isBook) return "Book";
+  
+  const loss = Math.max(0, wpBefore - wpAfter);
+
+  if (loss <= 2) return "Best";
+  if (loss <= 5) return "Excellent";
+  if (loss <= 10) return "Good";
+  if (loss <= 20) return "Inaccuracy";
+  if (loss <= 30) return "Mistake";
+  return "Blunder"; // Miss logic is handled in the post-processing
+}
+
+// Calculate Estimated Rating based on accuracy
+function estimateRating(accuracy) {
+  if (accuracy >= 99) return 2800;
+  if (accuracy >= 95) return 2400;
+  if (accuracy >= 90) return 2000;
+  if (accuracy >= 80) return 1500;
+  if (accuracy >= 70) return 1100;
+  if (accuracy >= 60) return 800;
+  if (accuracy >= 50) return 600;
+  return 400;
+}
+
 // ==========================================
-// MAIN APPLICATION
+// SASSY COACH TEMPLATES
+// ==========================================
+const getCoachText = (classification, piece, san, isYou, alt) => {
+  const actor = isYou ? "You" : "Your opponent";
+  const pos = isYou ? "your" : "their";
+  
+  if (classification === "Blunder") return `${san} is a blunder. ${actor} permitted a massive advantage. ${alt ? `The best option was ${alt}.` : ''}`;
+  if (classification === "Mistake") return `${san} is a mistake. This surrenders positional control. ${alt ? `${actor} had an opportunity to play ${alt}.` : ''}`;
+  if (classification === "Inaccuracy") return `${san} is an inaccuracy. ${alt ? `${actor} best option was ${alt}.` : 'There was a sharper continuation.'}`;
+  if (classification === "Miss") return `${san} is a miss. ${actor} missed a tactical sequence that would have won material.`;
+  if (classification === "Good") return `${san} is good. A solid, playable move that maintains the balance.`;
+  if (classification === "Excellent") return `${san} is excellent. ${actor} found a great square for ${pos} piece.`;
+  if (classification === "Best") return `${san} is best. This keeps an eye on the position while staying active.`;
+  if (classification === "Great") return `${san} is a great move. ${actor} found a powerful tactical continuation.`;
+  if (classification === "Book") return `${san} is a book move. A fundamental opening move.`;
+  return `${san} was played.`;
+};
+
+// ==========================================
+// MAIN APP COMPONENT
 // ==========================================
 export default function App() {
   const [game, setGame] = useState(new Chess());
   const [engine, setEngine] = useState(null);
   
+  // States
   const [gameMode, setGameMode] = useState('input'); // input, review, summary
   const [pgnInput, setPgnInput] = useState('');
+  const [userColor, setUserColor] = useState('w'); // 'w' or 'b'
+  
   const [reviewMoves, setReviewMoves] = useState([]);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(-1);
   const [isViewingAlt, setIsViewingAlt] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState(0);
-  
   const [summaryData, setSummaryData] = useState(null);
+  
   const batchRef = useRef({ isActive: false, queue: [], results: [], currentScore: 0, currentMate: null, parsedReview: [] });
 
-  // Initialize Stockfish Web Worker
+  // Init Engine
   useEffect(() => {
     fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.1/stockfish.js')
       .then(res => res.text())
@@ -79,7 +112,6 @@ export default function App() {
         
         worker.onmessage = (e) => {
           const line = e.data;
-          
           if (line.includes('info') && line.includes('score cp')) {
             const match = line.match(/score cp (-?\d+)/);
             if (match) {
@@ -94,7 +126,6 @@ export default function App() {
               batchRef.current.currentScore = batchRef.current.currentMate > 0 ? 30000 : -30000;
             }
           }
-
           if (line.includes('bestmove')) {
             const moveLAN = line.split(' ')[1];
             if (batchRef.current.isActive) {
@@ -110,8 +141,7 @@ export default function App() {
 
               if (completed < total) {
                 worker.postMessage(`position fen ${batchRef.current.queue[completed]}`);
-                // Use Depth 12 for accuracy matching Chess.com's baseline analysis
-                worker.postMessage('go depth 12'); 
+                worker.postMessage('go movetime 150'); // Balanced for speed and depth
               } else {
                 finishBatchAnalysis();
               }
@@ -144,10 +174,10 @@ export default function App() {
       batchRef.current = { isActive: true, queue: fenList, results: [], currentScore: 0, currentMate: null, parsedReview };
       setIsAnalyzing(true);
       setProgress(0);
-      setGameMode('review');
+      setGameMode('summary'); // Switch to summary view while analyzing to show progress
       
       engine.postMessage(`position fen ${fenList[0]}`);
-      engine.postMessage('go depth 12');
+      engine.postMessage('go movetime 150');
     } catch(err) { alert("Invalid PGN."); }
   }
 
@@ -155,52 +185,64 @@ export default function App() {
     const { parsedReview, results } = batchRef.current;
     
     let wAccSum = 0, bAccSum = 0, wMoves = 0, bMoves = 0;
-    const counts = { w: { Best:0, Excellent:0, Good:0, Inaccuracy:0, Mistake:0, Blunder:0, Book:0 }, b: { Best:0, Excellent:0, Good:0, Inaccuracy:0, Mistake:0, Blunder:0, Book:0 } };
+    const counts = { w: { Brilliant:0, Great:0, Best:0, Excellent:0, Good:0, Inaccuracy:0, Mistake:0, Miss:0, Blunder:0, Book:0 }, b: { Brilliant:0, Great:0, Best:0, Excellent:0, Good:0, Inaccuracy:0, Mistake:0, Miss:0, Blunder:0, Book:0 } };
 
     const finalizedMoves = parsedReview.map((m, idx) => {
       const beforeData = results[idx] || {score: 0, mate: null, bestMove: ''};
       const afterData = results[idx + 1] || {score: 0, mate: null, bestMove: ''};
 
-      const scoreBefore = beforeData.score;
-      const scoreAfter = -afterData.score; // Invert to current player's perspective
+      // Normalize scores to White's perspective
+      const isWhiteTurnBefore = (idx % 2 === 0);
+      let scoreBeforeW = isWhiteTurnBefore ? beforeData.score : -beforeData.score;
+      let scoreAfterW = !isWhiteTurnBefore ? afterData.score : -afterData.score;
 
-      const isBook = idx < 8 && (scoreAfter - scoreBefore) > -50;
-      let classification = classifyMove(scoreBefore, scoreAfter, isBook);
-
-      if (m.san.includes('#')) classification = "Best Move"; // Mates are always best
-
-      const wpBefore = cpToWinProb(scoreBefore);
-      const wpAfter = cpToWinProb(scoreAfter);
-      const accuracy = calculateAccuracy(wpBefore, wpAfter);
-
-      // Tally mapping logic
-      const mapKey = classification === "Best Move" ? "Best" : classification;
-      if (counts[m.color][mapKey] !== undefined) counts[m.color][mapKey]++;
+      const wpBefore = cpToWinProb(scoreBeforeW);
+      const wpAfter = cpToWinProb(scoreAfterW);
       
+      // Calculate loss from the perspective of the player who just moved
+      const playerWpBefore = m.color === 'w' ? wpBefore : (100 - wpBefore);
+      const playerWpAfter = m.color === 'w' ? wpAfter : (100 - wpAfter);
+      
+      const accuracy = calculateAccuracy(playerWpBefore, playerWpAfter);
+      const isBook = idx < 10 && (playerWpBefore - playerWpAfter) < 2;
+      const isMate = m.san.includes('#');
+
+      let classification = classifyMove(playerWpBefore, playerWpAfter, isBook, isMate);
+
+      // Miss Logic (If opponent blundered previously, and player failed to capitalize)
+      if (idx > 0 && classification === "Blunder") {
+        const prevMove = parsedReview[idx-1];
+        // Simplified Miss heuristic
+        if (prevMove && prevMove.san) classification = "Miss";
+      }
+
+      counts[m.color][classification]++;
       if (m.color === 'w' && !isBook) { wAccSum += accuracy; wMoves++; }
       if (m.color === 'b' && !isBook) { bAccSum += accuracy; bMoves++; }
 
+      const isYou = m.color === userColor;
+      const coachText = getCoachText(classification, PIECE_NAMES[m.piece], m.san, isYou, beforeData.bestMove);
+
       return { 
-        ...m, 
-        classification, 
-        bestMoveLAN: beforeData.bestMove, 
-        evalScore: scoreAfter,
-        evalMate: afterData.mate,
-        accuracy
+        ...m, classification, bestMoveLAN: beforeData.bestMove, 
+        evalScore: scoreAfterW, evalMate: afterData.mate, accuracy, coachText
       };
     });
 
+    const finalWAcc = wMoves ? (wAccSum / wMoves) : 100;
+    const finalBAcc = bMoves ? (bAccSum / bMoves) : 100;
+
     setSummaryData({
-      wAcc: wMoves ? (wAccSum / wMoves).toFixed(1) : 100,
-      bAcc: bMoves ? (bAccSum / bMoves).toFixed(1) : 100,
+      wAcc: finalWAcc.toFixed(1),
+      bAcc: finalBAcc.toFixed(1),
+      wElo: estimateRating(finalWAcc),
+      bElo: estimateRating(finalBAcc),
       counts
     });
 
     setReviewMoves(finalizedMoves);
     setIsAnalyzing(false);
     batchRef.current.isActive = false;
-    setCurrentReviewIndex(-1);
-    setGameMode('review');
   }
 
   function navigateReview(direction) {
@@ -208,30 +250,47 @@ export default function App() {
     else if (direction === 'end') setCurrentReviewIndex(reviewMoves.length - 1);
     else {
       const newIdx = currentReviewIndex + direction;
-      if (newIdx >= -1 && newIdx < reviewMoves.length) {
-        setCurrentReviewIndex(newIdx);
-        setGame(newIdx === -1 ? new Chess() : new Chess(reviewMoves[newIdx].fenAfter));
-      }
+      if (newIdx >= -1 && newIdx < reviewMoves.length) setCurrentReviewIndex(newIdx);
     }
     setIsViewingAlt(false);
   }
 
+  function showAlternativeLine() {
+    const currentMove = reviewMoves[currentReviewIndex];
+    if (!currentMove || !currentMove.bestMoveLAN) return;
+    const altGame = new Chess(currentMove.fenBefore); 
+    try {
+      altGame.move({ from: currentMove.bestMoveLAN.substring(0, 2), to: currentMove.bestMoveLAN.substring(2, 4), promotion: 'q' });
+      setGame(altGame);
+      setIsViewingAlt(true);
+    } catch(e) {}
+  }
+
+  function resetToCurrentReviewMove() {
+    const move = reviewMoves[currentReviewIndex];
+    if (move) {
+      setGame(new Chess(move.fenAfter));
+      setIsViewingAlt(false);
+    }
+  }
+
+  // ==========================================
+  // RENDER HELPERS
+  // ==========================================
   const currentMove = currentReviewIndex >= 0 ? reviewMoves[currentReviewIndex] : null;
-  const currentFen = currentMove ? currentMove.fenAfter : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const currentFen = isViewingAlt ? game.fen() : (currentMove ? currentMove.fenAfter : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
   
+  // Format Eval String (Always from White's perspective on the bar like chess.com)
   let evalString = "0.00";
-  let evalRaw = 0;
+  let evalRaw = 0; // positive is white advantage
   if (currentMove) {
     if (currentMove.evalMate) {
       evalString = `M${Math.abs(currentMove.evalMate)}`;
       evalRaw = currentMove.evalMate > 0 ? 1000 : -1000;
     } else {
-      evalRaw = currentMove.color === 'w' ? currentMove.evalScore : -currentMove.evalScore;
+      evalRaw = currentMove.evalScore;
       evalString = `${evalRaw > 0 ? '+' : ''}${(evalRaw / 100).toFixed(2)}`;
     }
-  } else if (reviewMoves.length > 0) {
-    evalRaw = reviewMoves[0].evalScore;
-    evalString = `${evalRaw > 0 ? '+' : ''}${(evalRaw / 100).toFixed(2)}`;
   }
 
   const evalHeight = useMemo(() => {
@@ -250,7 +309,7 @@ export default function App() {
 
   const activeArrows = useMemo(() => {
     if (isViewingAlt) return []; 
-    if (currentMove && currentMove.bestMoveLAN && ["Blunder", "Mistake", "Inaccuracy"].includes(currentMove.classification)) {
+    if (currentMove && currentMove.bestMoveLAN && ["Blunder", "Mistake", "Inaccuracy", "Miss"].includes(currentMove.classification)) {
       return [
         [currentMove.from, currentMove.to, "rgba(202, 52, 49, 0.8)"], 
         [currentMove.bestMoveLAN.substring(0, 2), currentMove.bestMoveLAN.substring(2, 4), "rgba(129, 182, 76, 0.8)"]
@@ -259,189 +318,246 @@ export default function App() {
     return [];
   }, [currentMove, isViewingAlt]);
 
-  const classificationColor = COLORS[currentMove?.classification] || COLORS.Good;
-  const classificationIcon = ICONS[currentMove?.classification] || '✓';
+  // View Variables
+  const myColor = userColor === 'w' ? 'White' : 'Black';
+  const oppColor = userColor === 'w' ? 'Black' : 'White';
+  const myName = "MoRN07";
+  const oppName = "Opponent";
 
   return (
     <>
       <style>{`
         body { margin: 0; padding: 0; background-color: #312e2b; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
-        .layout-grid { display: flex; height: 100vh; width: 100vw; }
+        .layout { display: flex; height: 100vh; width: 100vw; justify-content: center; }
         
-        /* LEFT: EVAL BAR + BOARD */
-        .left-panel { flex: 1; display: flex; align-items: center; justify-content: center; background: #312e2b; padding: 20px; gap: 20px; min-width: 600px; }
-        
-        .eval-container { width: 30px; height: calc(100vh - 120px); max-height: 720px; background: #403d39; border-radius: 4px; display: flex; flex-direction: column; overflow: hidden; position: relative; border: 2px solid #262421; }
+        /* LEFT: BOARD AREA */
+        .left-col { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; gap: 15px; max-width: 800px; }
+        .eval-bar { width: 25px; height: clamp(400px, 80vh, 700px); background: #403d39; border-radius: 4px; display: flex; flex-direction: column; overflow: hidden; position: relative; border: 2px solid #262421; }
         .eval-fill { background: #fff; width: 100%; position: absolute; bottom: 0; transition: height 0.4s ease; }
-        .eval-text { position: absolute; width: 100%; text-align: center; font-size: 10px; font-weight: bold; z-index: 10; padding: 4px 0; }
-
-        .board-container { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 12px; }
-        .player-tag { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #a59f97; }
-        .player-tag-left { display: flex; align-items: center; gap: 10px; }
-        .player-tag strong { color: #fff; font-size: 15px; }
-        .avatar { width: 36px; height: 36px; background: #403d39; border-radius: 4px; background-size: cover; background-position: center; }
-        .clock { background: #fff; color: #333; font-weight: bold; padding: 6px 12px; border-radius: 4px; font-size: 16px; font-family: monospace; }
-        .clock.dark { background: #262421; color: #a59f97; }
+        .eval-txt { position: absolute; width: 100%; text-align: center; font-size: 10px; font-weight: bold; z-index: 10; padding: 4px 0; }
+        .board-wrapper { width: 100%; max-width: clamp(400px, 80vh, 700px); display: flex; flex-direction: column; gap: 10px; }
+        
+        .player-bar { display: flex; justify-content: space-between; align-items: center; background: #262421; padding: 8px 12px; border-radius: 4px; }
+        .player-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 14px; }
+        .avatar { width: 32px; height: 32px; background: #403d39; border-radius: 4px; background-size: cover; }
+        .rating-badge { font-size: 12px; color: #a59f97; font-weight: normal; }
 
         /* RIGHT: REVIEW PANEL */
-        .right-panel { width: 450px; background: #262421; display: flex; flex-direction: column; height: 100%; border-left: 1px solid #403d39; }
+        .right-col { width: 450px; background: #262421; display: flex; flex-direction: column; height: 100%; border-left: 1px solid #403d39; }
         
-        .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid #403d39; font-weight: bold; font-size: 16px; background: #1e1e1e; }
-        .header-icons { color: #a59f97; display: flex; gap: 15px; cursor: pointer; }
+        .tab-header { display: flex; padding: 15px 20px; border-bottom: 1px solid #403d39; background: #1e1e1e; font-weight: bold; align-items: center; justify-content: space-between; }
+        .tab-header span { display: flex; gap: 10px; color: #a59f97; cursor: pointer; }
 
-        .coach-section { padding: 20px; display: flex; gap: 15px; background: #262421; }
-        .coach-avatar { width: 48px; height: 48px; background: url('https://www.chess.com/bundles/web/images/coach/coach-anya.png') center/cover; border-radius: 50%; }
-        .coach-bubble { flex: 1; background: #fff; color: #333; padding: 15px; border-radius: 12px; border-top-left-radius: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; }
-        .bubble-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-        .bubble-badge { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; }
-        .icon-badge { width: 20px; height: 20px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-        .eval-pill { background: #333; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        /* Input Screen */
+        .setup-screen { padding: 30px; display: flex; flex-direction: column; gap: 20px; height: 100%; justify-content: center; }
+        .setup-screen textarea { height: 150px; background: #1e1e1e; color: #fff; border: 1px solid #403d39; padding: 15px; border-radius: 8px; font-family: monospace; resize: none; }
+        .color-selector { display: flex; gap: 10px; }
+        .color-btn { flex: 1; padding: 15px; background: #312e2b; border: 2px solid #403d39; color: #fff; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .color-btn.active { border-color: #81b64c; background: #403d39; }
+        .start-btn { padding: 15px; background: #81b64c; color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .start-btn:hover { background: #96bc4b; }
 
-        .resume-bar { padding: 0 20px 20px 20px; }
-        .resume-btn { width: 100%; background: #81b64c; color: #fff; border: none; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .resume-btn:hover { background: #96bc4b; }
+        /* Summary Screen */
+        .summary-screen { padding: 20px; overflow-y: auto; flex: 1; }
+        .coach-card { background: #312e2b; padding: 15px; border-radius: 8px; display: flex; gap: 15px; align-items: center; margin-bottom: 20px; }
+        .coach-face { width: 48px; height: 48px; background: url('https://www.chess.com/bundles/web/images/coach/coach-anya.png') center/cover; border-radius: 50%; }
+        .coach-text { background: #fff; color: #333; padding: 10px 15px; border-radius: 8px; font-size: 14px; position: relative; flex: 1; font-weight: 500; }
+        
+        .acc-grid { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #403d39; padding-bottom: 20px; }
+        .acc-col { text-align: center; flex: 1; }
+        .acc-box { font-size: 24px; font-weight: bold; background: #fff; color: #333; padding: 8px; border-radius: 6px; margin-top: 8px; display: inline-block; min-width: 60px; }
+        .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #312e2b; font-size: 14px; }
+        .stat-badge { display: flex; align-items: center; gap: 6px; width: 100px; justify-content: center; }
+        .stat-icon { width: 18px; height: 18px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+
+        /* Review Mode */
+        .review-coach { padding: 20px; background: #262421; display: flex; gap: 15px; align-items: flex-start; }
+        .review-bubble { background: #fff; color: #333; padding: 15px; border-radius: 12px; border-top-left-radius: 0; flex: 1; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .bubble-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; }
+        .eval-pill { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #666; }
+        
+        .action-bar { padding: 0 20px 15px; display: flex; gap: 10px; }
+        .action-btn { flex: 1; padding: 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-share { background: #e0e0e0; color: #333; }
+        .btn-next { background: #81b64c; color: #fff; }
 
         .move-list { flex: 1; overflow-y: auto; background: #2b2826; }
         .move-row { display: flex; border-bottom: 1px solid #312e2b; background: #262421; }
-        .move-num { width: 45px; text-align: center; padding: 10px 0; color: #888; font-size: 13px; background: #312e2b; }
-        .move-cell { flex: 1; padding: 10px 15px; cursor: pointer; display: flex; align-items: center; font-weight: bold; font-size: 14px; color: #a59f97; }
+        .move-num { width: 40px; text-align: center; padding: 10px 0; color: #888; font-size: 13px; background: #312e2b; }
+        .move-cell { flex: 1; padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: #a59f97; }
         .move-cell:hover { background: #312e2b; }
         .move-cell.active { background: #403d39; color: #fff; }
-        .inline-icon { width: 16px; height: 16px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; margin-right: 8px; }
 
-        .graph-section { height: 80px; background: #1e1e1e; border-top: 1px solid #403d39; position: relative; display: flex; align-items: flex-end; }
-        .graph-area { width: 100%; height: 100%; }
-
-        .nav-controls { display: flex; background: #262421; padding: 15px; gap: 5px; align-items: center; border-top: 1px solid #403d39; }
-        .nav-icon-btn { flex: 1; background: #312e2b; border: none; color: #a59f97; padding: 15px 0; border-radius: 6px; cursor: pointer; font-size: 18px; transition: background 0.2s; }
-        .nav-icon-btn:hover:not(:disabled) { background: #403d39; color: #fff; }
-        .nav-icon-btn:disabled { opacity: 0.5; cursor: default; }
-
-        .pgn-input { padding: 30px; display: flex; flex-direction: column; height: 100%; }
-        .pgn-textarea { width: 100%; height: 250px; background: #1e1e1e; color: #fff; border: 1px solid #403d39; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-family: monospace; resize: none; box-sizing: border-box; }
+        .graph-area { height: 60px; background: #1e1e1e; border-top: 1px solid #403d39; position: relative; }
         
-        /* Graph Styles */
-        svg path.fill { fill: rgba(255, 255, 255, 0.1); }
+        .nav-bar { display: flex; background: #262421; padding: 15px; gap: 5px; align-items: center; border-top: 1px solid #403d39; }
+        .nav-btn { flex: 1; background: #312e2b; border: none; color: #a59f97; padding: 12px 0; border-radius: 6px; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        .nav-btn:hover:not(:disabled) { background: #403d39; color: #fff; }
+        .nav-btn:disabled { opacity: 0.5; }
+        .nav-play { flex: 2; background: #81b64c; color: #fff; font-weight: bold; }
+        .nav-play:hover { background: #96bc4b; }
       `}</style>
 
-      <div className="layout-grid">
+      <div className="layout">
         
         {/* LEFT PANEL */}
-        <div className="left-panel">
-          {/* Evaluation Bar */}
-          <div className="eval-container">
-            <div className="eval-text" style={{ top: 0, color: evalRaw < 0 ? '#fff' : '#888' }}>
+        <div className="left-col">
+          <div className="eval-bar">
+            <div className="eval-txt" style={{ top: 0, color: evalRaw < 0 ? '#fff' : '#888' }}>
               {evalRaw < 0 ? evalString : ''}
             </div>
             <div className="eval-fill" style={{ height: evalHeight }} />
-            <div className="eval-text" style={{ bottom: 0, color: evalRaw > 0 ? '#333' : '#888' }}>
+            <div className="eval-txt" style={{ bottom: 0, color: evalRaw > 0 ? '#333' : '#888' }}>
               {evalRaw > 0 ? evalString : ''}
             </div>
           </div>
 
-          {/* Board Area */}
-          <div className="board-container">
-            
-            {/* Top Player (Opponent) */}
-            <div className="player-tag">
-              <div className="player-tag-left">
-                <div className="avatar" style={{backgroundImage: "url('https://www.chess.com/bundles/web/images/user-image.svg')"}}></div>
-                <div>
-                  <strong>sjjad_98</strong> (319) 🇮🇶
-                </div>
+          <div className="board-wrapper">
+            <div className="player-bar">
+              <div className="player-info">
+                <div className="avatar"></div>
+                <span>{oppName} <span className="rating-badge">(?)</span></span>
               </div>
-              <div className="clock dark">06:33</div>
             </div>
 
             <Chessboard
               position={currentFen}
               customSquareStyles={activeSquareStyles}
               showBoardNotation={true}
-              customDarkSquareStyle={{ backgroundColor: "#b58863" }} // Classic wood dark
-              customLightSquareStyle={{ backgroundColor: "#f0d9b5" }} // Classic wood light
+              customDarkSquareStyle={{ backgroundColor: "#b58863" }}
+              customLightSquareStyle={{ backgroundColor: "#f0d9b5" }}
               customArrows={activeArrows.map(arr => [arr[0], arr[1]])}
               customArrowColor={activeArrows.length > 0 ? activeArrows[0][2] : "rgba(129, 182, 76, 0.8)"}
-              animationDuration={200}
+              animationDuration={isViewingAlt ? 0 : 250}
+              boardOrientation={userColor === 'w' ? 'white' : 'black'}
             />
 
-            {/* Bottom Player (MoRN07) */}
-            <div className="player-tag">
-              <div className="player-tag-left">
+            <div className="player-bar">
+              <div className="player-info">
                 <div className="avatar" style={{backgroundImage: "url('https://images.chesscomfiles.com/uploads/v1/user/326880000.3fa6db7f.160x160o.22304859846b.png')"}}></div>
-                <div>
-                  <strong>MoRN07</strong> (326) 🇵🇹 💎
-                  <div style={{fontSize: '11px', color: '#888', marginTop: '2px'}}>♙♙♘♗♕ +6</div>
-                </div>
+                <span>{myName} <span className="rating-badge">(?)</span></span>
               </div>
-              <div className="clock">07:53</div>
             </div>
-
           </div>
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="right-panel">
-          
-          <div className="panel-header">
-            <span style={{cursor:'pointer', color:'#a59f97'}} onClick={() => setGameMode('input')}>←</span>
+        <div className="right-col">
+          <div className="tab-header">
+            <span onClick={() => setGameMode('input')}>←</span>
             <span>★ Game Review</span>
-            <div className="header-icons">
-              <span>🔊</span>
-              <span>⚙</span>
-            </div>
+            <span>🔊 ⚙</span>
           </div>
 
           {gameMode === 'input' && (
-            <div className="pgn-input">
-              <h2 style={{marginTop: 0}}>Analyze Game</h2>
-              <textarea className="pgn-textarea" placeholder="Paste PGN text here..." value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} />
-              <button className="resume-btn" onClick={startAnalysis}>Run Review</button>
+            <div className="setup-screen">
+              <h2 style={{margin: 0, textAlign: 'center'}}>Analyze Game</h2>
+              <textarea placeholder="Paste PGN here..." value={pgnInput} onChange={e => setPgnInput(e.target.value)} />
+              
+              <div className="color-selector">
+                <button className={`color-btn ${userColor === 'w' ? 'active' : ''}`} onClick={() => setUserColor('w')}>Play as White</button>
+                <button className={`color-btn ${userColor === 'b' ? 'active' : ''}`} onClick={() => setUserColor('b')}>Play as Black</button>
+              </div>
+
+              <button className="start-btn" onClick={startAnalysis}>Run Review</button>
             </div>
           )}
 
-          {isAnalyzing && (
-            <div className="pgn-input" style={{alignItems: 'center', textAlign: 'center'}}>
+          {gameMode === 'summary' && isAnalyzing && (
+            <div className="setup-screen" style={{textAlign: 'center'}}>
               <h2>Deep Analysis Running</h2>
-              <p style={{color: '#a59f97'}}>Stockfish 16 is evaluating the game...</p>
-              <div style={{width: '100%', height: '8px', background: '#403d39', borderRadius: '4px', marginTop: '20px', overflow: 'hidden'}}>
+              <p style={{color: '#a59f97'}}>Evaluating the entire game sequentially...</p>
+              <div style={{width: '100%', height: '8px', background: '#403d39', borderRadius: '4px', overflow: 'hidden'}}>
                 <div style={{width: `${progress}%`, height: '100%', background: '#81b64c', transition: 'width 0.2s'}} />
               </div>
+              <p style={{fontSize: '12px', color: '#888', marginTop: '10px'}}>{Math.round(progress)}% Complete</p>
+            </div>
+          )}
+
+          {gameMode === 'summary' && summaryData && !isAnalyzing && (
+            <div className="summary-screen">
+              <div className="coach-card">
+                <div className="coach-face"></div>
+                <div className="coach-text">You had a nice tactical find in this game. Let's review!</div>
+              </div>
+              
+              <div className="acc-grid">
+                <div className="acc-col">
+                  <div style={{color: '#a59f97', fontSize: '13px'}}>{userColor === 'w' ? myName : oppName} (White)</div>
+                  <div className="acc-box">{summaryData.wAcc}</div>
+                </div>
+                <div className="acc-col">
+                  <div style={{color: '#a59f97', fontSize: '13px'}}>{userColor === 'b' ? myName : oppName} (Black)</div>
+                  <div className="acc-box" style={{background: '#333', color: '#fff'}}>{summaryData.bAcc}</div>
+                </div>
+              </div>
+
+              {["Brilliant", "Great", "Best", "Excellent", "Good", "Inaccuracy", "Mistake", "Miss", "Blunder", "Book"].map(type => {
+                const wCount = summaryData.counts.w[type];
+                const bCount = summaryData.counts.b[type];
+                if (!wCount && !bCount) return null;
+                const color = COLORS[type];
+                return (
+                  <div className="stat-row" key={type}>
+                    <span style={{flex: 1, textAlign: 'right', fontWeight: 'bold', color}}>{wCount || 0}</span>
+                    <div className="stat-badge">
+                      <span className="stat-icon" style={{backgroundColor: color}}>{ICONS[type]}</span>
+                      <span style={{color: '#a59f97'}}>{type}</span>
+                    </div>
+                    <span style={{flex: 1, textAlign: 'left', fontWeight: 'bold', color}}>{bCount || 0}</span>
+                  </div>
+                );
+              })}
+
+              <div className="stat-row" style={{marginTop: '20px', borderTop: '1px solid #403d39', paddingTop: '20px'}}>
+                <span style={{flex: 1, textAlign: 'right', fontWeight: 'bold', fontSize: '18px'}}>{summaryData.wElo}</span>
+                <div className="stat-badge" style={{color: '#fff', fontWeight: 'bold'}}>Game Rating</div>
+                <span style={{flex: 1, textAlign: 'left', fontWeight: 'bold', fontSize: '18px'}}>{summaryData.bElo}</span>
+              </div>
+              
+              <button className="start-btn" style={{width: '100%', marginTop: '30px'}} onClick={() => { setGameMode('review'); setCurrentReviewIndex(0); setGame(new Chess(reviewMoves[0].fenAfter)); }}>
+                Start Review
+              </button>
             </div>
           )}
 
           {gameMode === 'review' && (
             <>
-              {/* Coach Section */}
-              <div className="coach-section">
-                <div className="coach-avatar"></div>
-                <div className="coach-bubble">
-                  {currentReviewIndex === -1 ? (
-                    <div style={{fontSize: '15px', fontWeight: 'bold'}}>You had a nice tactical find in this game. Let's review!</div>
-                  ) : (
-                    <>
-                      <div className="bubble-top">
-                        <div className="bubble-badge">
-                          <div className="icon-badge" style={{backgroundColor: classificationColor}}>{classificationIcon}</div>
-                          {currentMove?.san} is {currentMove?.classification?.toLowerCase()}
-                        </div>
-                        <div className="eval-pill">{evalString}</div>
-                      </div>
-                      <div style={{fontSize: '13px', lineHeight: '1.5'}}>
-                        {currentMove?.classification === "Best Move" ? "This keeps an eye on the position while staying active." : 
-                         currentMove?.classification === "Blunder" ? "You permitted the opponent to win material." : 
-                         "A solid move that controls space."}
-                      </div>
-                    </>
-                  )}
+              {/* Coach Top Section */}
+              <div className="review-coach">
+                <div className="coach-face"></div>
+                <div className="review-bubble">
+                  <div className="bubble-header">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <span className="stat-icon" style={{backgroundColor: COLORS[currentMove?.classification] || COLORS.Good}}>
+                        {ICONS[currentMove?.classification] || '✓'}
+                      </span>
+                      {isViewingAlt ? "Engine Alternative" : `${currentMove?.san} is ${currentMove?.classification?.toLowerCase()}`}
+                    </div>
+                    <div className="eval-pill">{evalString}</div>
+                  </div>
+                  <div>{currentMove?.coachText}</div>
                 </div>
               </div>
 
-              {/* Action Bar */}
-              <div className="resume-bar">
-                <button className="resume-btn">▶ Resume</button>
+              {/* Action Buttons */}
+              <div className="action-bar">
+                {(!isViewingAlt && ["Blunder", "Mistake", "Inaccuracy", "Miss"].includes(currentMove?.classification) && currentMove?.bestMoveLAN) ? (
+                  <>
+                    <button className="action-btn btn-share" onClick={showAlternativeLine}>🔍 Best Move</button>
+                    <button className="action-btn btn-next" onClick={() => navigateReview(1)}>Next ➔</button>
+                  </>
+                ) : isViewingAlt ? (
+                  <button className="action-btn btn-next" style={{width: '100%'}} onClick={resetToCurrentReviewMove}>↩ Resume</button>
+                ) : (
+                  <>
+                    <button className="action-btn btn-share">Share</button>
+                    <button className="action-btn btn-next" onClick={() => navigateReview(1)}>Next ➔</button>
+                  </>
+                )}
               </div>
 
-              {/* Move List */}
+              {/* Move List Table */}
               <div className="move-list">
                 {Array.from({ length: Math.ceil(reviewMoves.length / 2) }).map((_, i) => {
                   const wMove = reviewMoves[i * 2];
@@ -451,13 +567,13 @@ export default function App() {
                       <div className="move-num">{i + 1}.</div>
                       
                       <div className={`move-cell ${currentReviewIndex === i * 2 ? 'active' : ''}`} onClick={() => navigateReview((i * 2) - currentReviewIndex)}>
-                        {wMove.classification && <div className="inline-icon" style={{backgroundColor: COLORS[wMove.classification]}}>{ICONS[wMove.classification]}</div>}
+                        {wMove.classification && <div className="stat-icon inline-icon" style={{backgroundColor: COLORS[wMove.classification]}}>{ICONS[wMove.classification]}</div>}
                         {wMove.san}
                       </div>
 
                       {bMove ? (
                         <div className={`move-cell ${currentReviewIndex === i * 2 + 1 ? 'active' : ''}`} onClick={() => navigateReview((i * 2 + 1) - currentReviewIndex)}>
-                          {bMove.classification && <div className="inline-icon" style={{backgroundColor: COLORS[bMove.classification]}}>{ICONS[bMove.classification]}</div>}
+                          {bMove.classification && <div className="stat-icon inline-icon" style={{backgroundColor: COLORS[bMove.classification]}}>{ICONS[bMove.classification]}</div>}
                           {bMove.san}
                         </div>
                       ) : <div className="move-cell"></div>}
@@ -466,60 +582,56 @@ export default function App() {
                 })}
               </div>
 
-              {/* Graph Area */}
-              <div className="graph-section">
-                <svg className="graph-area" preserveAspectRatio="none">
-                  {/* Center Line */}
+              {/* Evaluation Graph SVG */}
+              <div className="graph-area">
+                <svg width="100%" height="100%" preserveAspectRatio="none">
                   <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#555" strokeWidth="1" />
-                  
-                  {/* Filled Area & Line */}
                   {reviewMoves.length > 0 && (
                     <>
                       <path 
                         className="fill"
-                        d={`M 0,40 ${reviewMoves.map((m, i) => {
+                        d={`M 0,30 ${reviewMoves.map((m, i) => {
                           const x = ((i + 1) / reviewMoves.length) * 100;
-                          const cp = m.color === 'w' ? m.evalScore : -m.evalScore; 
+                          const cp = m.evalScore; // Graph absolute white advantage
                           const clamped = Math.max(-500, Math.min(500, cp));
-                          const y = 40 - (clamped / 500) * 40;
+                          const y = 30 - (clamped / 500) * 30;
                           return `L ${x}%,${y}`;
-                        }).join(' ')} L 100%,40 Z`}
+                        }).join(' ')} L 100%,30 Z`}
                       />
                       <path 
-                        d={`M 0,40 ${reviewMoves.map((m, i) => {
+                        d={`M 0,30 ${reviewMoves.map((m, i) => {
                           const x = ((i + 1) / reviewMoves.length) * 100;
-                          const cp = m.color === 'w' ? m.evalScore : -m.evalScore; 
+                          const cp = m.evalScore;
                           const clamped = Math.max(-500, Math.min(500, cp));
-                          const y = 40 - (clamped / 500) * 40;
+                          const y = 30 - (clamped / 500) * 30;
                           return `L ${x}%,${y}`;
                         }).join(' ')}`}
                         fill="none" stroke="#fff" strokeWidth="2"
                       />
-                      {/* Dots */}
                       {reviewMoves.map((m, i) => {
                         const x = ((i + 1) / reviewMoves.length) * 100;
-                        const cp = m.color === 'w' ? m.evalScore : -m.evalScore;
+                        const cp = m.evalScore;
                         const clamped = Math.max(-500, Math.min(500, cp));
-                        const y = 40 - (clamped / 500) * 40;
-                        return <circle key={i} cx={`${x}%`} cy={y} r="3" fill={COLORS[m.classification] || '#fff'} />;
+                        const y = 30 - (clamped / 500) * 30;
+                        return <circle key={i} cx={`${x}%`} cy={y} r="2.5" fill={COLORS[m.classification] || '#fff'} />;
                       })}
                     </>
                   )}
                 </svg>
               </div>
 
-              {/* Bottom Nav Controls */}
-              <div className="nav-controls">
-                <button className="nav-icon-btn" onClick={() => navigateReview('start')}>|❮</button>
-                <button className="nav-icon-btn" disabled={currentReviewIndex <= -1} onClick={() => navigateReview(-1)}>❮</button>
-                <button className="nav-icon-btn" style={{flex: 2}}>▶</button>
-                <button className="nav-icon-btn" disabled={currentReviewIndex >= reviewMoves.length - 1} onClick={() => navigateReview(1)}>❯</button>
-                <button className="nav-icon-btn" onClick={() => navigateReview('end')}>❯|</button>
+              {/* Bottom Navigation */}
+              <div className="nav-bar">
+                <button className="nav-btn" onClick={() => navigateReview('start')}>|❮</button>
+                <button className="nav-btn" disabled={currentReviewIndex <= -1} onClick={() => navigateReview(-1)}>❮</button>
+                <button className="nav-btn nav-play">Start Review</button>
+                <button className="nav-btn" disabled={currentReviewIndex >= reviewMoves.length - 1} onClick={() => navigateReview(1)}>❯</button>
+                <button className="nav-btn" onClick={() => navigateReview('end')}>❯|</button>
               </div>
             </>
           )}
-        </div>
 
+        </div>
       </div>
     </>
   );
