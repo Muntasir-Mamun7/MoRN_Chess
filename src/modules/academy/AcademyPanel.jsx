@@ -60,7 +60,7 @@ export default function AcademyPanel({
 
             {showHint && academyNode && (
               <div className="hint-box" style={{ marginTop: '15px' }}>
-                💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the orange arrow on the board).
+                💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the green arrow on the board).
               </div>
             )}
 
@@ -71,7 +71,7 @@ export default function AcademyPanel({
                 </button>
               )}
               {!academyError && academyNode && !academyNode.endpoint && (
-                <button className="action-btn" style={{ background: '#e58f2a' }} onClick={onProvideHint}>
+                <button className="action-btn" style={{ background: '#81b64c' }} onClick={onProvideHint}>
                   💡 Give me a Hint
                 </button>
               )}
