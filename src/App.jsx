@@ -33,8 +33,19 @@ const playSound = (isCapture, isMuted) => {
   new Audio(url).play().catch(() => {});
 };
 
+// Helper to convert SAN to LAN for Hints
+function getMoveCoords(fen, sanMove) {
+  const temp = new Chess(fen);
+  try {
+    const move = temp.move(sanMove);
+    return move ? { from: move.from, to: move.to } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ============================================================================
-// ACADEMY MODULES DATABASE (Structured for future expansion)
+// ACADEMY MODULES DATABASE (With Punishments)
 // ============================================================================
 const ACADEMY_MODULES = [
   {
@@ -59,7 +70,9 @@ const ACADEMY_MODULES = [
             next: {
               prompt: "Bc4 targets f7. Checkmate is threatened! Do NOT play Nf6 (it falls for the trap). Block the Queen's path with your pawn.",
               expected: "g6",
-              wrong: { "Nf6": "Blunder! White will play Qxf7# Checkmate. You must block the Queen's diagonal first." },
+              wrong: [
+                { move: "Nf6", response: "Qxf7#", msg: "Blunder! White plays Qxf7# Checkmate. You must block the Queen's diagonal first." }
+              ],
               response: "Qf3",
               next: {
                 prompt: "The Queen retreats to f3, renewing the mate threat. Now that g6 blocks the diagonal, safely develop your Knight.",
@@ -72,7 +85,9 @@ const ACADEMY_MODULES = [
                   next: {
                     prompt: "The Queen retreats. Don't play the slow d6. Strike immediately with the aggressive central pawn break!",
                     expected: "d5",
-                    wrong: { "d6": "d6 is too slow and lets White defend. Play d5 to blow open the center!" },
+                    wrong: [
+                      { move: "d6", response: "c3", msg: "d6 is too slow and lets White defend with c3. Play d5 to blow open the center!" }
+                    ],
                     response: "exd5",
                     next: {
                       prompt: "White captures. Play the brilliant in-between move to hit the Queen before recapturing the pawn.",
@@ -131,10 +146,12 @@ const ACADEMY_MODULES = [
         startFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3", // After 1. e4 e5 2. Bc4 Nc6
         color: "b",
         tree: {
-          prompt: "White brings the Queen to f3 directly to eye f7 without playing Qh5 first. Don't play Bc5! Defend f7 by developing your Knight.",
+          prompt: "White brings the Queen to f3 directly to eye f7 without playing Qh5 first. Defend f7 by developing your Knight.",
           botFirst: "Qf3",
           expected: "Nf6",
-          wrong: { "Bc5": "Blunder! Qxf7# Checkmate. Develop the Knight to f6 to block the Queen." },
+          wrong: [
+            { move: "Bc5", response: "Qxf7#", msg: "Blunder! White plays Qxf7# Checkmate. Develop the Knight to f6 to block the Queen." }
+          ],
           response: "c3",
           next: {
             prompt: "White plays c3 to prepare a center push. Immediately seize the initiative with a central pawn break!",
@@ -146,17 +163,6 @@ const ACADEMY_MODULES = [
     ]
   }
 ];
-
-// Helper to get from/to squares from a SAN move for the Hint system
-function getMoveCoords(fen, sanMove) {
-  const temp = new Chess(fen);
-  try {
-    const move = temp.move(sanMove);
-    return move ? { from: move.from, to: move.to } : null;
-  } catch (e) {
-    return null;
-  }
-}
 
 // ============================================================================
 // CAPS2 WIN PROBABILITY ALGORITHM
@@ -229,6 +235,7 @@ export default function App() {
   const [academyMessage, setAcademyMessage] = useState('');
   const [academyError, setAcademyError] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [safeFen, setSafeFen] = useState(''); // Stores the FEN before user's mistake
   
   // Board Interaction State
   const [moveFrom, setMoveFrom] = useState('');
@@ -256,10 +263,7 @@ export default function App() {
 
   const speakMoRN = (text) => {
     if (isVoiceMuted || !('speechSynthesis' in window)) return;
-    
-    // Fix for Chrome getting stuck: cancel previous, wait 50ms, then speak
     window.speechSynthesis.cancel(); 
-    
     setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(text);
       if (activeVoice) utterance.voice = activeVoice;
@@ -343,6 +347,7 @@ export default function App() {
     }
     
     setGame(newGame);
+    setSafeFen(newGame.fen());
     setAcademyNode(currentNode);
     setAcademyMessage(currentNode.prompt);
     setAcademyError(false);
@@ -360,6 +365,7 @@ export default function App() {
       setGame(gameCopy);
       playSound(moveObj.flags.includes('c'), isVoiceMuted);
       setAcademyError(false);
+      setSafeFen(gameCopy.fen()); // Save state before bot moves
 
       if (academyNode.endpoint) {
         setAcademyMessage(academyNode.endpoint);
@@ -370,6 +376,7 @@ export default function App() {
         setTimeout(() => {
           const moveRes = gameCopy.move(academyNode.response);
           setGame(new Chess(gameCopy.fen()));
+          setSafeFen(gameCopy.fen()); // Save state after bot moves
           playSound(moveRes.flags.includes('c'), isVoiceMuted);
           setAcademyNode(academyNode.next);
           setAcademyMessage(academyNode.next.prompt);
@@ -377,31 +384,53 @@ export default function App() {
         }, 800);
       }
     } else {
-      // Wrong Move
-      playSound(false, isVoiceMuted); 
-      setGame(gameCopy);
+      // Wrong Move Execution
       setAcademyError(true);
-      const errorMsg = (academyNode.wrong && academyNode.wrong[moveObj.san]) 
-        ? academyNode.wrong[moveObj.san] 
-        : `That's not the best move here. ${academyNode.prompt}`;
+      playSound(moveObj.flags.includes('c'), isVoiceMuted);
       
-      setAcademyMessage(errorMsg);
-      speakMoRN(errorMsg);
+      let specificWrong = null;
+      if (academyNode.wrong && Array.isArray(academyNode.wrong)) {
+         specificWrong = academyNode.wrong.find(w => w.move === moveObj.san);
+      }
+
+      if (specificWrong) {
+         setGame(gameCopy); // Show user's mistake
+         setAcademyMessage("Wait for it...");
+         
+         // Bot plays the punishing move
+         setTimeout(() => {
+           try {
+             const moveRes = gameCopy.move(specificWrong.response);
+             setGame(new Chess(gameCopy.fen()));
+             playSound(moveRes.flags.includes('c'), isVoiceMuted);
+             setAcademyMessage(specificWrong.msg);
+             speakMoRN(specificWrong.msg);
+           } catch(e) { console.error("Punishment move failed", e); }
+         }, 800);
+      } else {
+         setGame(gameCopy);
+         const msg = `That's not the best move here. ${academyNode.prompt}`;
+         setAcademyMessage(msg);
+         speakMoRN("Try again. " + academyNode.prompt);
+      }
     }
   }
 
   function undoAcademyMove() {
-    const gameCopy = new Chess(game.fen());
-    gameCopy.undo();
-    setGame(gameCopy);
+    if (safeFen) {
+      setGame(new Chess(safeFen));
+    }
     setAcademyError(false);
+    setShowHint(false);
     setAcademyMessage(academyNode.prompt);
-    speakMoRN(academyNode.prompt);
+    speakMoRN("Let's try that again.");
   }
 
   function provideHint() {
-    if (academyError) {
-      undoAcademyMove();
+    if (academyError && safeFen) {
+      setGame(new Chess(safeFen)); // Auto-undo if they made a mistake
+      setAcademyError(false);
+      setAcademyMessage(academyNode.prompt);
     }
     setShowHint(true);
   }
@@ -505,8 +534,6 @@ export default function App() {
         if (m.color === 'b') { bAccSum += accuracy; bMoves++; }
       }
 
-      const isYou = m.color === userColor;
-      // Re-use logic for generic coach text
       let coachText = `${m.san} is ${classification.toLowerCase()}.`;
       if(classification === "Blunder") coachText += " You allowed a massive advantage.";
       else if(classification === "Best Move" || classification === "Best") coachText = "Spot on! Best move.";
@@ -541,7 +568,6 @@ export default function App() {
     if (newIdx >= -1 && newIdx < reviewMoves.length) {
       setCurrentReviewIndex(newIdx);
       setGame(newIdx === -1 ? new Chess() : new Chess(reviewMoves[newIdx].fenAfter));
-      if (newIdx >= 0) speakMoRN(reviewMoves[newIdx].coachText);
     }
   }
 
@@ -572,6 +598,8 @@ export default function App() {
     setActiveModule(null);
     setActiveLesson(null);
     setAcademyNode(null);
+    setAcademyError(false);
+    setShowHint(false);
     window.speechSynthesis?.cancel();
   }
 
@@ -580,7 +608,6 @@ export default function App() {
   // --------------------------------------------------------
   const currentTheme = BOARD_THEMES[boardTheme] || BOARD_THEMES.wood;
   
-  // Custom Styles for Review Highlighting & Hinting
   const activeSquareStyles = useMemo(() => {
     let styles = { ...optionSquares };
     if (gameMode === 'review' && currentReviewIndex >= 0 && !isViewingAlt) {
@@ -592,14 +619,12 @@ export default function App() {
   }, [optionSquares, gameMode, currentReviewIndex, isViewingAlt, reviewMoves]);
 
   const activeArrows = useMemo(() => {
-    // Review Alt Arrows
     if (gameMode === 'review' && currentReviewIndex >= 0 && !isViewingAlt) {
        const move = reviewMoves[currentReviewIndex];
        if (move && move.bestMoveLAN && ["Blunder", "Mistake", "Inaccuracy", "Miss"].includes(move.classification)) {
          return [[move.bestMoveLAN.substring(0, 2), move.bestMoveLAN.substring(2, 4), "rgba(129, 182, 76, 0.8)"]];
        }
     }
-    // Academy Hint Arrow
     if (gameMode === 'academy' && showHint && academyNode) {
        const coords = getMoveCoords(game.fen(), academyNode.expected);
        if (coords) {
@@ -706,7 +731,7 @@ export default function App() {
               <>
                 <div className="panel-header" style={{color: '#9C27B0'}}>
                   <span style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                    {activeModule && <span style={{cursor:'pointer', color:'#aaa'}} onClick={() => {setActiveLesson(null); setActiveModule(null);}}>←</span>}
+                    {activeModule && <span style={{cursor:'pointer', color:'#aaa'}} onClick={() => {setActiveLesson(null); setActiveModule(null); setAcademyError(false); setShowHint(false);}}>←</span>}
                     🎓 MoRN Academy
                   </span>
                   <span style={{cursor:'pointer', color:'#888'}} onClick={() => setIsVoiceMuted(!isVoiceMuted)}>
@@ -745,7 +770,7 @@ export default function App() {
 
                       {showHint && academyNode && (
                         <div className="hint-box" style={{marginTop: '15px'}}>
-                          💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the orange arrow).
+                          💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the orange arrow on the board).
                         </div>
                       )}
 
@@ -760,7 +785,7 @@ export default function App() {
                             💡 Give me a Hint
                           </button>
                         )}
-                        <button className="action-btn" style={{background: '#333'}} onClick={() => setActiveLesson(null)}>
+                        <button className="action-btn" style={{background: '#333'}} onClick={() => { setActiveLesson(null); setAcademyError(false); setShowHint(false); }}>
                           Back to Lessons
                         </button>
                       </div>
