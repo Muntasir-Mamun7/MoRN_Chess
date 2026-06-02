@@ -149,6 +149,9 @@ const getCoachText = (classification, piece, san, isYou, alt) => {
 export default function App() {
   const [game, setGame] = useState(new Chess());
   const [engine, setEngine] = useState(null);
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
   
   // App State
   const [gameMode, setGameMode] = useState('input'); // input, review, summary, academy, settings
@@ -183,6 +186,14 @@ export default function App() {
   const [moveFrom, setMoveFrom] = useState('');
   const [optionSquares, setOptionSquares] = useState({});
   const batchRef = useRef({ isActive: false, queue: [], results: [], currentScore: 0, currentMate: null, parsedReview: [] });
+  const isMobileViewport = viewportWidth <= 768;
+
+  const mobileBoardWidth = useMemo(() => {
+    if (!isMobileViewport) return undefined;
+    const horizontalPadding = viewportWidth <= 480 ? 24 : 36;
+    const evalBarWidth = gameMode !== 'academy' ? 30 : 0;
+    return Math.max(250, viewportWidth - horizontalPadding - evalBarWidth);
+  }, [gameMode, isMobileViewport, viewportWidth]);
 
   // --------------------------------------------------------
   // Voice Synthesis Setup
@@ -202,6 +213,12 @@ export default function App() {
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, [coachGender]);
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const speakMoRN = (text) => {
     if (isVoiceMuted || !('speechSynthesis' in window)) return;
@@ -681,8 +698,38 @@ export default function App() {
         .nav-play:hover { background: #96bc4b; }
 
         @media (max-width: 768px) {
-          .main-layout { flex-direction: column; align-items: center; }
-          .board-section, .side-panel { width: 100%; max-width: 100%; }
+          .app-container { padding: 14px; }
+          .header { margin-bottom: 14px; }
+          .header h1 { font-size: 1.8rem; margin-bottom: 12px; line-height: 1.2; }
+          .nav-menu { width: 100%; gap: 8px; }
+          .menu-btn { flex: 1 1 calc(50% - 8px); padding: 11px 10px; font-size: 13px; }
+          .main-layout { flex-direction: column; align-items: center; gap: 14px; }
+          .board-section, .side-panel { width: 100%; max-width: 100%; min-width: 0; }
+          .board-section { gap: 10px; }
+          .eval-bar { width: 20px; }
+          .panel-header { padding: 12px 14px; font-size: 15px; }
+          .panel-content { padding: 14px; }
+          .action-btn { padding: 12px; font-size: 14px; }
+          .player-bar { padding: 8px 10px; }
+          .player-info { font-size: 13px; gap: 8px; min-width: 0; }
+          .move-cell { padding: 10px; font-size: 13px; min-width: 0; }
+          .move-num { width: 34px; font-size: 12px; }
+          .stat-badge { width: auto; min-width: 90px; }
+          .acc-box { font-size: 24px; min-width: 70px; }
+        }
+
+        @media (max-width: 480px) {
+          .app-container { padding: 10px; }
+          .header h1 { font-size: 1.45rem; }
+          .menu-btn { flex-basis: 100%; }
+          .board-section { gap: 8px; }
+          .eval-bar { width: 18px; }
+          .panel-header { padding: 10px 12px; }
+          .panel-content { padding: 12px; }
+          .nav-bar { padding: 10px; gap: 4px; }
+          .nav-btn { font-size: 14px; padding: 10px 0; }
+          .stat-row { font-size: 13px; }
+          .stat-badge { min-width: 78px; font-size: 12px; }
         }
       `}</style>
 
@@ -719,6 +766,7 @@ export default function App() {
                 position={game.fen()}
                 onPieceDrop={handlePieceDrop}
                 onSquareClick={handleSquareClick}
+                boardWidth={mobileBoardWidth}
                 customSquareStyles={activeSquareStyles}
                 customArrows={activeArrows.map(arr => [arr[0], arr[1]])}
                 customArrowColor={activeArrows.length > 0 ? activeArrows[0][2] : CHESS_COM_GREEN}
