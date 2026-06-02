@@ -8,7 +8,7 @@ export const ACADEMY_MODULES = [
         id: 'scholars_mate_g4',
         title: "Lesson 1: Crush the Flank Attack (g4)",
         description: "Defend against the early Queen attack and punish the aggressive g4 push.",
-        startFen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        startFen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", 
         color: "b",
         tree: {
           prompt: "White opens with 1. e4. Respond by controlling the center with your e-pawn.",
@@ -61,7 +61,7 @@ export const ACADEMY_MODULES = [
         id: 'scholars_mate_passive',
         title: "Lesson 2: Break the Passive Defense",
         description: "Counter White when they try to defend d4 with Ne2.",
-        startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+        startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4", 
         color: "b",
         tree: {
           prompt: "White plays Ne2 to defend the d4 square. Continue your kingside development by fianchettoing your Bishop.",
@@ -94,7 +94,7 @@ export const ACADEMY_MODULES = [
         id: 'scholars_mate_sneaky',
         title: "Lesson 3: The Sneaky Qf3 Line",
         description: "What to do when White delays the Queen attack and brings it to f3 directly.",
-        startFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3",
+        startFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3", 
         color: "b",
         tree: {
           prompt: "White brings the Queen to f3 directly to eye f7 without playing Qh5 first. Defend f7 by developing your Knight.",
