@@ -25,6 +25,8 @@ const BOARD_THEMES = {
   dark: { light: '#aaaaaa', dark: '#555555' }
 };
 
+const AFFIRMATIONS = ["You got it!", "Cool!", "Great!", "Spot on!", "Exactly!", "Nice one!"];
+
 const playSound = (isCapture, isMuted) => {
   if (isMuted) return;
   const url = isCapture 
@@ -33,19 +35,18 @@ const playSound = (isCapture, isMuted) => {
   new Audio(url).play().catch(() => {});
 };
 
-// Helper to convert SAN to LAN for Hints
-function getMoveCoords(fen, sanMove) {
-  const temp = new Chess(fen);
+// Helper for Hint Arrows
+function getExpectedCoords(fen, expectedSan) {
   try {
-    const move = temp.move(sanMove);
-    return move ? { from: move.from, to: move.to } : null;
-  } catch (e) {
-    return null;
-  }
+    const temp = new Chess(fen);
+    const m = temp.move(expectedSan);
+    if (m) return { from: m.from, to: m.to };
+  } catch (e) {}
+  return null;
 }
 
 // ============================================================================
-// ACADEMY MODULES DATABASE (With Punishments)
+// ACADEMY MODULES DATABASE (With Interactive Punishments)
 // ============================================================================
 const ACADEMY_MODULES = [
   {
@@ -56,7 +57,7 @@ const ACADEMY_MODULES = [
       {
         id: 'scholars_mate_g4',
         title: "Lesson 1: Crush the Flank Attack (g4)",
-        description: "Learn the absolute best defense against the early Queen attack and punish the aggressive g4 push.",
+        description: "Defend against the early Queen attack and punish the aggressive g4 push.",
         startFen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", // After 1. e4
         color: "b",
         tree: {
@@ -71,7 +72,7 @@ const ACADEMY_MODULES = [
               prompt: "Bc4 targets f7. Checkmate is threatened! Do NOT play Nf6 (it falls for the trap). Block the Queen's path with your pawn.",
               expected: "g6",
               wrong: [
-                { move: "Nf6", response: "Qxf7#", msg: "Blunder! White plays Qxf7# Checkmate. You must block the Queen's diagonal first." }
+                { move: "Nf6", response: "Qxf7#", msg: "Blunder! White plays Qxf7# Checkmate. You must block the Queen's diagonal first!" }
               ],
               response: "Qf3",
               next: {
@@ -86,7 +87,7 @@ const ACADEMY_MODULES = [
                     prompt: "The Queen retreats. Don't play the slow d6. Strike immediately with the aggressive central pawn break!",
                     expected: "d5",
                     wrong: [
-                      { move: "d6", response: "c3", msg: "d6 is too slow and lets White defend with c3. Play d5 to blow open the center!" }
+                      { move: "d6", response: "c3", msg: "d6 is too slow. It lets White defend with c3. Play d5 to blow open the center!" }
                     ],
                     response: "exd5",
                     next: {
@@ -109,7 +110,7 @@ const ACADEMY_MODULES = [
       {
         id: 'scholars_mate_passive',
         title: "Lesson 2: Break the Passive Defense",
-        description: "Learn how to counter White when they try to defend d4 with Ne2 or c3.",
+        description: "Counter White when they try to defend d4 with Ne2.",
         startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4", // After 1. e4 e5 2. Qh5 Nc6 3. Bc4 g6 4. Qf3 Nf6
         color: "b",
         tree: {
@@ -142,7 +143,7 @@ const ACADEMY_MODULES = [
       {
         id: 'scholars_mate_sneaky',
         title: "Lesson 3: The Sneaky Qf3 Line",
-        description: "What to do when White delays the Queen attack and brings it to f3 instead of h5.",
+        description: "What to do when White delays the Queen attack and brings it to f3 directly.",
         startFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3", // After 1. e4 e5 2. Bc4 Nc6
         color: "b",
         tree: {
@@ -201,6 +202,35 @@ function estimateRating(acc) {
   return Math.round(2125 + ((acc-95)*150));             
 }
 
+function getPhaseIcon(accuracy) {
+  if (accuracy >= 95) return { icon: "★", color: COLORS.Best };
+  if (accuracy >= 80) return { icon: "👍", color: COLORS.Excellent };
+  if (accuracy >= 65) return { icon: "✓", color: COLORS.Good };
+  if (accuracy >= 40) return { icon: "!", color: COLORS.Great };
+  return { icon: "?!", color: COLORS.Inaccuracy };
+}
+
+// ============================================================================
+// DYNAMIC MORN COACH
+// ============================================================================
+const getCoachText = (classification, piece, san, isYou, alt) => {
+  const actor = isYou ? "You" : "Your opponent";
+  const pos = isYou ? "your" : "their";
+  const templates = {
+    Blunder: [`${san} is a blunder. ${actor} permitted a massive advantage.`, `A critical error by ${actor}.`],
+    Mistake: [`${san} is a mistake. This surrenders positional control.`, `Not the right idea. ${actor} allowed the position to worsen.`],
+    Inaccuracy: [`${san} is an inaccuracy. ${alt ? `Why not ${alt}?` : 'There was a sharper continuation.'}`],
+    Miss: [`A tragic miss! ${actor} had a chance to punish a blunder but played ${san} instead.`],
+    Good: [`${san} is good. A solid, playable move.`, `${actor} played a sensible, safe move.`],
+    Excellent: [`${san} is excellent. ${actor} found a highly active square.`],
+    Best: [`${san} is the absolute best move. Flawless tactical execution.`, `The strongest engine continuation.`],
+    Great: [`${san} is a great move. ${actor} found a powerful tactic!`],
+    Book: [`${san} is established opening theory. Deep preparation!`]
+  };
+  const pool = templates[classification] || [`${san} was played.`];
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
 // ============================================================================
 // MAIN APPLICATION COMPONENT
 // ============================================================================
@@ -235,7 +265,7 @@ export default function App() {
   const [academyMessage, setAcademyMessage] = useState('');
   const [academyError, setAcademyError] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [safeFen, setSafeFen] = useState(''); // Stores the FEN before user's mistake
+  const [safeFen, setSafeFen] = useState(''); // Essential for precise Undo/Retry
   
   // Board Interaction State
   const [moveFrom, setMoveFrom] = useState('');
@@ -328,7 +358,7 @@ export default function App() {
   }, []);
 
   // --------------------------------------------------------
-  // Academy Mode Logic
+  // Academy Mode Logic (With Interactive Punishment)
   // --------------------------------------------------------
   function openModule(mod) {
     setActiveModule(mod);
@@ -347,7 +377,7 @@ export default function App() {
     }
     
     setGame(newGame);
-    setSafeFen(newGame.fen());
+    setSafeFen(newGame.fen()); // Set safe rewind point
     setAcademyNode(currentNode);
     setAcademyMessage(currentNode.prompt);
     setAcademyError(false);
@@ -356,69 +386,79 @@ export default function App() {
     speakMoRN(currentNode.prompt);
   }
 
-  function handleAcademyMove(moveObj, gameCopy) {
+  function handleAcademyMove(moveObj, fenBeforeMove) {
     setShowHint(false);
     if (!academyNode) return;
 
+    const gameCopy = new Chess(fenBeforeMove);
+    gameCopy.move(moveObj); // Execute user's move
+
     if (moveObj.san === academyNode.expected || moveObj.lan === academyNode.expected) {
-      // Correct Move
+      // CORRECT MOVE
       setGame(gameCopy);
+      setSafeFen(gameCopy.fen()); // Update safe fallback
       playSound(moveObj.flags.includes('c'), isVoiceMuted);
       setAcademyError(false);
-      setSafeFen(gameCopy.fen()); // Save state before bot moves
 
       if (academyNode.endpoint) {
         setAcademyMessage(academyNode.endpoint);
         speakMoRN(academyNode.endpoint);
         setAcademyNode(null);
       } else if (academyNode.response) {
-        setAcademyMessage("Excellent! Opponent is responding...");
+        const affirm = AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)];
+        setAcademyMessage(`${affirm} Opponent is responding...`);
+        speakMoRN(affirm);
+        
         setTimeout(() => {
           const moveRes = gameCopy.move(academyNode.response);
           setGame(new Chess(gameCopy.fen()));
-          setSafeFen(gameCopy.fen()); // Save state after bot moves
+          setSafeFen(gameCopy.fen()); // Secure new baseline after bot move
           playSound(moveRes.flags.includes('c'), isVoiceMuted);
           setAcademyNode(academyNode.next);
           setAcademyMessage(academyNode.next.prompt);
           speakMoRN(academyNode.next.prompt);
-        }, 800);
+        }, 1000);
       }
     } else {
-      // Wrong Move Execution
+      // WRONG MOVE (Trigger Punishment Engine)
+      setSafeFen(fenBeforeMove); // Lock fallback exactly before the mistake
       setAcademyError(true);
       playSound(moveObj.flags.includes('c'), isVoiceMuted);
-      
+      setGame(new Chess(gameCopy.fen())); // Show their bad move
+
       let specificWrong = null;
       if (academyNode.wrong && Array.isArray(academyNode.wrong)) {
          specificWrong = academyNode.wrong.find(w => w.move === moveObj.san);
       }
 
-      if (specificWrong) {
-         setGame(gameCopy); // Show user's mistake
-         setAcademyMessage("Wait for it...");
+      if (specificWrong && specificWrong.response) {
+         setAcademyMessage("Oh no! Wait for it...");
+         speakMoRN("Oh no!");
          
-         // Bot plays the punishing move
+         // Execute the crushing bot response
          setTimeout(() => {
            try {
-             const moveRes = gameCopy.move(specificWrong.response);
+             const punishRes = gameCopy.move(specificWrong.response);
              setGame(new Chess(gameCopy.fen()));
-             playSound(moveRes.flags.includes('c'), isVoiceMuted);
+             playSound(punishRes.flags.includes('c'), isVoiceMuted);
              setAcademyMessage(specificWrong.msg);
              speakMoRN(specificWrong.msg);
-           } catch(e) { console.error("Punishment move failed", e); }
-         }, 800);
+           } catch(e) {
+             setAcademyMessage(specificWrong.msg);
+             speakMoRN(specificWrong.msg);
+           }
+         }, 1000);
       } else {
-         setGame(gameCopy);
-         const msg = `That's not the best move here. ${academyNode.prompt}`;
+         const msg = `That's not the right move. ${academyNode.prompt}`;
          setAcademyMessage(msg);
-         speakMoRN("Try again. " + academyNode.prompt);
+         speakMoRN("Try again.");
       }
     }
   }
 
   function undoAcademyMove() {
     if (safeFen) {
-      setGame(new Chess(safeFen));
+      setGame(new Chess(safeFen)); // Instantly rewinds mistake + punishment
     }
     setAcademyError(false);
     setShowHint(false);
@@ -428,11 +468,13 @@ export default function App() {
 
   function provideHint() {
     if (academyError && safeFen) {
-      setGame(new Chess(safeFen)); // Auto-undo if they made a mistake
+      setGame(new Chess(safeFen)); // Clean up board if a mistake was made
       setAcademyError(false);
-      setAcademyMessage(academyNode.prompt);
     }
     setShowHint(true);
+    const msg = `Hint: Try playing ${academyNode.expected}. Follow the arrow.`;
+    setAcademyMessage(msg);
+    speakMoRN(msg);
   }
 
   // --------------------------------------------------------
@@ -445,10 +487,11 @@ export default function App() {
       if (piece && piece.color === game.turn()) { setMoveFrom(square); updateOptionSquares(square); }
       return;
     }
-    const gameCopy = new Chess(game.fen());
+    const fenBeforeMove = game.fen();
+    const tempGame = new Chess(fenBeforeMove);
     try {
-      const move = gameCopy.move({ from: moveFrom, to: square, promotion: 'q' });
-      if (move) handleAcademyMove(move, gameCopy);
+      const move = tempGame.move({ from: moveFrom, to: square, promotion: 'q' });
+      if (move) handleAcademyMove(move, fenBeforeMove);
     } catch (e) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) { setMoveFrom(square); updateOptionSquares(square); return; }
@@ -458,10 +501,11 @@ export default function App() {
 
   function handlePieceDrop(source, target) {
     if (gameMode !== 'academy' || academyError || !academyNode) return false;
-    const gameCopy = new Chess(game.fen());
+    const fenBeforeMove = game.fen();
+    const tempGame = new Chess(fenBeforeMove);
     try {
-      const move = gameCopy.move({ from: source, to: target, promotion: 'q' });
-      if (move) { handleAcademyMove(move, gameCopy); return true; }
+      const move = tempGame.move({ from: source, to: target, promotion: 'q' });
+      if (move) { handleAcademyMove(move, fenBeforeMove); return true; }
     } catch (e) { return false; }
     return false;
   }
@@ -506,6 +550,12 @@ export default function App() {
   function finishBatchAnalysis() {
     const { parsedReview, results } = batchRef.current;
     let wAccSum = 0, bAccSum = 0, wMoves = 0, bMoves = 0;
+    
+    // Phase Tracking
+    let wOpenSum = 0, wOpenCount = 0, bOpenSum = 0, bOpenCount = 0;
+    let wMidSum = 0, wMidCount = 0, bMidSum = 0, bMidCount = 0;
+    let wEndSum = 0, wEndCount = 0, bEndSum = 0, bEndCount = 0;
+
     const counts = { w: {}, b: {} };
     STAT_ORDER.forEach(s => { counts.w[s]=0; counts.b[s]=0; });
 
@@ -532,11 +582,13 @@ export default function App() {
       if (!isBook) {
         if (m.color === 'w') { wAccSum += accuracy; wMoves++; }
         if (m.color === 'b') { bAccSum += accuracy; bMoves++; }
+        if (idx < 20) { if(m.color === 'w'){ wOpenSum += accuracy; wOpenCount++; } else { bOpenSum += accuracy; bOpenCount++; } }
+        else if (idx < 60) { if(m.color === 'w'){ wMidSum += accuracy; wMidCount++; } else { bMidSum += accuracy; bMidCount++; } }
+        else { if(m.color === 'w'){ wEndSum += accuracy; wEndCount++; } else { bEndSum += accuracy; bEndCount++; } }
       }
 
-      let coachText = `${m.san} is ${classification.toLowerCase()}.`;
-      if(classification === "Blunder") coachText += " You allowed a massive advantage.";
-      else if(classification === "Best Move" || classification === "Best") coachText = "Spot on! Best move.";
+      const isYou = m.color === userColor;
+      const coachText = getCoachText(classification, PIECE_NAMES[m.piece], m.san, isYou, beforeData.bestMove);
 
       return { 
         ...m, classification, bestMoveLAN: beforeData.bestMove, 
@@ -550,7 +602,11 @@ export default function App() {
     setSummaryData({
       wAcc: finalWAcc.toFixed(1), bAcc: finalBAcc.toFixed(1),
       wElo: estimateRating(finalWAcc), bElo: estimateRating(finalBAcc),
-      counts
+      counts,
+      phases: {
+        w: { open: wOpenCount ? (wOpenSum/wOpenCount) : 100, mid: wMidCount ? (wMidSum/wMidCount) : 100, end: wEndCount ? (wEndSum/wEndCount) : 100 },
+        b: { open: bOpenCount ? (bOpenSum/bOpenCount) : 100, mid: bMidCount ? (bMidSum/bMidCount) : 100, end: bEndCount ? (bEndSum/bEndCount) : 100 }
+      }
     });
 
     setReviewMoves(finalizedMoves);
@@ -568,6 +624,7 @@ export default function App() {
     if (newIdx >= -1 && newIdx < reviewMoves.length) {
       setCurrentReviewIndex(newIdx);
       setGame(newIdx === -1 ? new Chess() : new Chess(reviewMoves[newIdx].fenAfter));
+      if (newIdx >= 0) speakMoRN(reviewMoves[newIdx].coachText);
     }
   }
 
@@ -600,6 +657,7 @@ export default function App() {
     setAcademyNode(null);
     setAcademyError(false);
     setShowHint(false);
+    setSafeFen('');
     window.speechSynthesis?.cancel();
   }
 
@@ -608,6 +666,28 @@ export default function App() {
   // --------------------------------------------------------
   const currentTheme = BOARD_THEMES[boardTheme] || BOARD_THEMES.wood;
   
+  const currentMove = currentReviewIndex >= 0 ? reviewMoves[currentReviewIndex] : null;
+  let evalRaw = 0; 
+  let evalString = `0.00`;
+
+  if (gameMode === 'review' && currentMove) {
+    if (currentMove.evalMate) {
+      evalString = `M${Math.abs(currentMove.evalMate)}`;
+      evalRaw = currentMove.evalMate > 0 ? 1000 : -1000;
+    } else {
+      evalRaw = currentMove.evalScore || 0;
+      evalString = `${evalRaw > 0 ? '+' : ''}${(evalRaw / 100).toFixed(2)}`;
+    }
+  } else if (gameMode === 'review' && reviewMoves.length > 0) {
+    evalRaw = reviewMoves[0].evalScore || 0;
+    evalString = `${evalRaw > 0 ? '+' : ''}${(evalRaw / 100).toFixed(2)}`;
+  }
+
+  const evalHeight = useMemo(() => {
+    const clamped = Math.max(-500, Math.min(500, evalRaw));
+    return `${((clamped + 500) / 1000) * 100}%`;
+  }, [evalRaw]);
+
   const activeSquareStyles = useMemo(() => {
     let styles = { ...optionSquares };
     if (gameMode === 'review' && currentReviewIndex >= 0 && !isViewingAlt) {
@@ -626,13 +706,13 @@ export default function App() {
        }
     }
     if (gameMode === 'academy' && showHint && academyNode) {
-       const coords = getMoveCoords(game.fen(), academyNode.expected);
+       const coords = getExpectedCoords(safeFen || game.fen(), academyNode.expected);
        if (coords) {
          return [[coords.from, coords.to, "rgba(255, 170, 0, 0.8)"]];
        }
     }
     return [];
-  }, [gameMode, currentReviewIndex, isViewingAlt, reviewMoves, showHint, academyNode, game]);
+  }, [gameMode, currentReviewIndex, isViewingAlt, reviewMoves, showHint, academyNode, game, safeFen]);
 
   return (
     <>
@@ -649,6 +729,9 @@ export default function App() {
         .main-layout { display: flex; gap: 20px; width: 100%; max-width: 1000px; justify-content: center; align-items: stretch; flex-wrap: wrap; }
         
         .board-section { display: flex; gap: 15px; flex: 1; min-width: 320px; max-width: 550px; }
+        .eval-bar { width: 25px; background: #333; border-radius: 6px; position: relative; overflow: hidden; border: 1px solid #444; display: flex; flex-direction: column; }
+        .eval-fill { background: #fff; width: 100%; position: absolute; bottom: 0; transition: height 0.3s; }
+        .eval-txt { position: absolute; width: 100%; text-align: center; font-size: 11px; font-weight: bold; z-index: 10; bottom: 5px; color: #000; text-shadow: 0px 0px 3px rgba(255,255,255,0.8); }
         .board-container { flex: 1; border-radius: 6px; overflow: hidden; box-shadow: 0 12px 24px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 10px; }
         .player-bar { display: flex; justify-content: space-between; align-items: center; background: #1e1e1e; padding: 8px 12px; border-radius: 4px; border: 1px solid #333; }
         .player-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 14px; }
@@ -671,6 +754,24 @@ export default function App() {
         .lesson-card { background: #262421; border: 1px solid #333; border-radius: 8px; padding: 15px; cursor: pointer; transition: 0.2s; }
         .lesson-card:hover { border-color: #81b64c; background: #2b2926; }
         .lesson-title { color: #81b64c; font-weight: bold; font-size: 16px; margin-bottom: 5px; }
+        
+        /* Summary Grid */
+        .acc-grid { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #403d39; padding-bottom: 20px; }
+        .acc-col { text-align: center; flex: 1; }
+        .acc-box { font-size: 28px; font-weight: bold; background: #fff; color: #333; padding: 8px; border-radius: 6px; margin-top: 8px; display: inline-block; min-width: 80px; }
+        .acc-box.dark { background: #333; color: #fff; }
+        .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #312e2b; font-size: 14px; }
+        .stat-badge { display: flex; align-items: center; gap: 6px; width: 100px; justify-content: center; }
+        .stat-icon { width: 18px; height: 18px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+
+        /* Review UI */
+        .move-list { flex: 1; overflow-y: auto; background: #2b2826; }
+        .move-row { display: flex; border-bottom: 1px solid #312e2b; background: #262421; }
+        .move-num { width: 40px; text-align: center; padding: 10px 0; color: #888; font-size: 13px; background: #312e2b; }
+        .move-cell { flex: 1; padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: #a59f97; }
+        .move-cell:hover { background: #312e2b; }
+        .move-cell.active { background: #403d39; color: #fff; }
+        .graph-area { height: 60px; background: #1e1e1e; border-top: 1px solid #403d39; position: relative; }
 
         @media (max-width: 768px) {
           .main-layout { flex-direction: column; align-items: center; }
@@ -693,6 +794,12 @@ export default function App() {
           
           {/* LEFT: BOARD */}
           <div className="board-section">
+            {gameMode !== 'academy' && (
+              <div className="eval-bar">
+                <div className="eval-fill" style={{ height: evalHeight }} />
+                <div className="eval-txt">{(evalRaw/100).toFixed(1)}</div>
+              </div>
+            )}
             <div className="board-container">
               <div className="player-bar">
                 <div className="player-info">
@@ -834,6 +941,193 @@ export default function App() {
                   <button className="action-btn" style={{background: isVoiceMuted ? '#444' : '#4CAF50', marginTop: 'auto'}} onClick={() => setIsVoiceMuted(!isVoiceMuted)}>
                     {isVoiceMuted ? '🔇 Sound & Voice Muted' : '🔊 Sound & Voice Active'}
                   </button>
+                </div>
+              </>
+            )}
+
+            {/* Analysis Screen */}
+            {gameMode === 'summary' && isAnalyzing && (
+              <>
+                <div className="panel-header" style={{color: '#2196F3'}}>★ Game Review</div>
+                <div className="panel-content" style={{justifyContent: 'center'}}>
+                  <div style={{textAlign: 'center', margin: 'auto'}}>
+                    <h3 style={{color: '#2196F3'}}>Deep Analysis Running</h3>
+                    <p style={{color: '#888'}}>Stockfish 16 is crunching the geometry...</p>
+                    <div style={{width: '100%', height: '10px', background: '#333', borderRadius: '5px', marginTop: '20px', overflow: 'hidden'}}>
+                      <div style={{width: `${progress}%`, height: '100%', background: '#2196F3', transition: 'width 0.2s'}} />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Summary Data */}
+            {gameMode === 'summary' && summaryData && !isAnalyzing && (
+              <>
+                <div className="panel-header" style={{color: '#2196F3'}}>★ Game Review</div>
+                <div className="panel-content">
+                  <div style={{display: 'flex', flexDirection: 'column'}}>
+                    <div className="coach-card" style={{borderLeftColor: '#2196F3'}}>
+                      <div className="coach-face" style={{minWidth: '48px'}}></div>
+                      <div className="coach-text">Here is your full game report. Let's review the key moments!</div>
+                    </div>
+                    
+                    <div className="acc-grid">
+                      <div className="acc-col">
+                        <div style={{color: '#a59f97', fontSize: '13px'}}>{userColor === 'w' ? 'You' : 'Opponent'} (White)</div>
+                        <div className="acc-box">{summaryData.wAcc}</div>
+                      </div>
+                      <div className="acc-col">
+                        <div style={{color: '#a59f97', fontSize: '13px'}}>{userColor === 'b' ? 'You' : 'Opponent'} (Black)</div>
+                        <div className="acc-box dark">{summaryData.bAcc}</div>
+                      </div>
+                    </div>
+
+                    {STAT_ORDER.map(type => {
+                      const wCount = summaryData.counts.w[type];
+                      const bCount = summaryData.counts.b[type];
+                      if (!wCount && !bCount) return null;
+                      const color = COLORS[type];
+                      return (
+                        <div className="stat-row" key={type}>
+                          <span style={{flex: 1, textAlign: 'right', fontWeight: 'bold', color}}>{wCount || 0}</span>
+                          <div className="stat-badge">
+                            <span className="stat-icon" style={{backgroundColor: color}}>{ICONS[type]}</span>
+                            <span style={{color: '#a59f97'}}>{type}</span>
+                          </div>
+                          <span style={{flex: 1, textAlign: 'left', fontWeight: 'bold', color}}>{bCount || 0}</span>
+                        </div>
+                      );
+                    })}
+
+                    <div className="stat-row" style={{marginTop: '20px', borderTop: '1px solid #403d39', paddingTop: '20px'}}>
+                      <span style={{flex: 1, textAlign: 'right', fontWeight: 'bold', fontSize: '18px'}}>{summaryData.wElo}</span>
+                      <div className="stat-badge" style={{color: '#fff', fontWeight: 'bold'}}>Game Rating</div>
+                      <span style={{flex: 1, textAlign: 'left', fontWeight: 'bold', fontSize: '18px'}}>{summaryData.bElo}</span>
+                    </div>
+
+                    <div className="stat-row" style={{marginTop: '20px', borderTop: '1px solid #403d39', paddingTop: '20px'}}>
+                      <span style={{flex: 1, textAlign: 'right'}}><span className="stat-icon" style={{backgroundColor: getPhaseIcon(summaryData.phases.w.open).color, display: 'inline-flex'}}>{getPhaseIcon(summaryData.phases.w.open).icon}</span></span>
+                      <div className="stat-badge" style={{color: '#fff', fontWeight: 'bold'}}>Opening</div>
+                      <span style={{flex: 1, textAlign: 'left'}}><span className="stat-icon" style={{backgroundColor: getPhaseIcon(summaryData.phases.b.open).color, display: 'inline-flex'}}>{getPhaseIcon(summaryData.phases.b.open).icon}</span></span>
+                    </div>
+                    <div className="stat-row">
+                      <span style={{flex: 1, textAlign: 'right'}}><span className="stat-icon" style={{backgroundColor: getPhaseIcon(summaryData.phases.w.mid).color, display: 'inline-flex'}}>{getPhaseIcon(summaryData.phases.w.mid).icon}</span></span>
+                      <div className="stat-badge" style={{color: '#fff', fontWeight: 'bold'}}>Middlegame</div>
+                      <span style={{flex: 1, textAlign: 'left'}}><span className="stat-icon" style={{backgroundColor: getPhaseIcon(summaryData.phases.b.mid).color, display: 'inline-flex'}}>{getPhaseIcon(summaryData.phases.b.mid).icon}</span></span>
+                    </div>
+                    <div className="stat-row">
+                      <span style={{flex: 1, textAlign: 'right'}}><span className="stat-icon" style={{backgroundColor: getPhaseIcon(summaryData.phases.w.end).color, display: 'inline-flex'}}>{getPhaseIcon(summaryData.phases.w.end).icon}</span></span>
+                      <div className="stat-badge" style={{color: '#fff', fontWeight: 'bold'}}>Endgame</div>
+                      <span style={{flex: 1, textAlign: 'left'}}><span className="stat-icon" style={{backgroundColor: getPhaseIcon(summaryData.phases.b.end).color, display: 'inline-flex'}}>{getPhaseIcon(summaryData.phases.b.end).icon}</span></span>
+                    </div>
+                    
+                    <button className="action-btn" style={{width: '100%', marginTop: '30px', background: '#81b64c'}} onClick={() => { setGameMode('review'); setCurrentReviewIndex(0); setGame(new Chess(reviewMoves[0].fenAfter)); }}>
+                      Start Review
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Active Review Navigation */}
+            {gameMode === 'review' && reviewMoves.length > 0 && currentMove && (
+              <>
+                <div className="panel-header" style={{color: '#2196F3'}}>★ Game Review</div>
+                <div style={{padding: '20px', flex: 1, display: 'flex', flexDirection: 'column'}}>
+                  <div className="coach-card" style={{borderLeftColor: COLORS[currentMove.classification] || '#81b64c'}}>
+                    <div className="coach-face" style={{minWidth: '48px'}}></div>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '5px', flex: 1}}>
+                      <div style={{fontWeight: 'bold', color: COLORS[currentMove.classification] || '#81b64c', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                        <span className="stat-icon" style={{background: COLORS[currentMove.classification] || '#81b64c', display: 'inline-flex'}}>
+                          {ICONS[currentMove.classification]}
+                        </span>
+                        {currentMove.san} is {currentMove.classification}
+                      </div>
+                      <p style={{margin: 0, fontSize: '13px', lineHeight: '1.5', color: '#ddd'}}>{currentMove.coachText}</p>
+                    </div>
+                  </div>
+
+                  <div style={{display: 'flex', gap: '10px', marginBottom: '15px'}}>
+                    {(!isViewingAlt && ["Blunder", "Mistake", "Inaccuracy", "Miss"].includes(currentMove?.classification) && currentMove?.bestMoveLAN) ? (
+                      <>
+                        <button className="action-btn" style={{background: '#1baca1', padding: '10px'}} onClick={showAlternativeLine}>🔍 Best Move</button>
+                        <button className="action-btn" style={{background: '#81b64c', padding: '10px'}} onClick={() => navigateReview(1)}>Next ➔</button>
+                      </>
+                    ) : isViewingAlt ? (
+                      <button className="action-btn" style={{background: '#666', padding: '10px'}} onClick={resetToCurrentReviewMove}>↩ Resume</button>
+                    ) : (
+                      <button className="action-btn" style={{background: '#81b64c', padding: '10px'}} onClick={() => navigateReview(1)}>Next ➔</button>
+                    )}
+                  </div>
+
+                  <div className="move-list">
+                    {Array.from({ length: Math.ceil(reviewMoves.length / 2) }).map((_, i) => {
+                      const wMove = reviewMoves[i * 2];
+                      const bMove = reviewMoves[i * 2 + 1];
+                      return (
+                        <div className="move-row" key={i}>
+                          <div className="move-num">{i + 1}.</div>
+                          
+                          <div className={`move-cell ${currentReviewIndex === i * 2 ? 'active' : ''}`} onClick={() => navigateReview((i * 2) - currentReviewIndex)}>
+                            {wMove.classification && <div className="stat-icon inline-icon" style={{backgroundColor: COLORS[wMove.classification], display: 'inline-flex', width:'16px', height:'16px', fontSize:'9px', marginRight:'8px'}}>{ICONS[wMove.classification]}</div>}
+                            {wMove.san}
+                          </div>
+
+                          {bMove ? (
+                            <div className={`move-cell ${currentReviewIndex === i * 2 + 1 ? 'active' : ''}`} onClick={() => navigateReview((i * 2 + 1) - currentReviewIndex)}>
+                              {bMove.classification && <div className="stat-icon inline-icon" style={{backgroundColor: COLORS[bMove.classification], display: 'inline-flex', width:'16px', height:'16px', fontSize:'9px', marginRight:'8px'}}>{ICONS[bMove.classification]}</div>}
+                              {bMove.san}
+                            </div>
+                          ) : <div className="move-cell"></div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="graph-area">
+                    <svg width="100%" height="100%" preserveAspectRatio="none">
+                      <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#555" strokeWidth="1" />
+                      {reviewMoves.length > 0 && (
+                        <>
+                          <path 
+                            d={`M 0,30 ${reviewMoves.map((m, i) => {
+                              const x = ((i + 1) / reviewMoves.length) * 100;
+                              const cp = m.evalScore; // Graph absolute white advantage
+                              const clamped = Math.max(-500, Math.min(500, cp));
+                              const y = 30 - (clamped / 500) * 30;
+                              return `L ${x}%,${y}`;
+                            }).join(' ')} L 100%,30 Z`}
+                            fill="rgba(255,255,255,0.05)"
+                          />
+                          <path 
+                            d={`M 0,30 ${reviewMoves.map((m, i) => {
+                              const x = ((i + 1) / reviewMoves.length) * 100;
+                              const cp = m.evalScore;
+                              const clamped = Math.max(-500, Math.min(500, cp));
+                              const y = 30 - (clamped / 500) * 30;
+                              return `L ${x}%,${y}`;
+                            }).join(' ')}`}
+                            fill="none" stroke="#fff" strokeWidth="2"
+                          />
+                          {reviewMoves.map((m, i) => {
+                            const x = ((i + 1) / reviewMoves.length) * 100;
+                            const cp = m.evalScore;
+                            const clamped = Math.max(-500, Math.min(500, cp));
+                            const y = 30 - (clamped / 500) * 30;
+                            return <circle key={i} cx={`${x}%`} cy={y} r="2.5" fill={COLORS[m.classification] || '#fff'} />;
+                          })}
+                        </>
+                      )}
+                    </svg>
+                  </div>
+
+                  <div style={{display: 'flex', gap: '10px', marginTop: '15px'}}>
+                    <button className="action-btn" style={{background: '#333', padding: '10px'}} onClick={() => navigateReview('start')}>|❮</button>
+                    <button className="action-btn" style={{background: '#333', padding: '10px'}} disabled={currentReviewIndex <= -1} onClick={() => navigateReview(-1)}>❮</button>
+                    <button className="action-btn" style={{background: '#333', padding: '10px'}} disabled={currentReviewIndex >= reviewMoves.length - 1} onClick={() => navigateReview(1)}>❯</button>
+                    <button className="action-btn" style={{background: '#333', padding: '10px'}} onClick={() => navigateReview('end')}>❯|</button>
+                  </div>
                 </div>
               </>
             )}
