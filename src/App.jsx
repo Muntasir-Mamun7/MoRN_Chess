@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
+import AcademyPanel from './modules/academy/AcademyPanel.jsx';
 
 // ============================================================================
 // CONSTANTS, THEMES & AUDIO
@@ -44,126 +45,6 @@ function getExpectedCoords(fen, expectedSan) {
   } catch (e) {}
   return null;
 }
-
-// ============================================================================
-// ACADEMY MODULES DATABASE (With Interactive Punishments)
-// ============================================================================
-const ACADEMY_MODULES = [
-  {
-    id: 'scholars_mate_module',
-    title: "How to Play Against Scholar's Mate",
-    description: "Learn Yellow Rook's masterclass to crush the early Queen attack and seize the initiative.",
-    lessons: [
-      {
-        id: 'scholars_mate_g4',
-        title: "Lesson 1: Crush the Flank Attack (g4)",
-        description: "Defend against the early Queen attack and punish the aggressive g4 push.",
-        startFen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", // After 1. e4
-        color: "b",
-        tree: {
-          prompt: "White opens with 1. e4. Respond by controlling the center with your e-pawn.",
-          expected: "e5",
-          response: "Qh5",
-          next: {
-            prompt: "Qh5! The e5 pawn is hanging. Defend it calmly by developing your Queenside Knight.",
-            expected: "Nc6",
-            response: "Bc4",
-            next: {
-              prompt: "Bc4 targets f7. Checkmate is threatened! Do NOT play Nf6 (it falls for the trap). Block the Queen's path with your pawn.",
-              expected: "g6",
-              wrong: [
-                { move: "Nf6", response: "Qxf7#", msg: "Blunder! White plays Qxf7# Checkmate. You must block the Queen's diagonal first!" }
-              ],
-              response: "Qf3",
-              next: {
-                prompt: "The Queen retreats to f3, renewing the mate threat. Now that g6 blocks the diagonal, safely develop your Knight.",
-                expected: "Nf6",
-                response: "g4",
-                next: {
-                  prompt: "White pushes g4 to kick your Knight. Punish this flank attack by striking in the center! Attack the Queen and aim at c2.",
-                  expected: "Nd4",
-                  response: "Qd1",
-                  next: {
-                    prompt: "The Queen retreats. Don't play the slow d6. Strike immediately with the aggressive central pawn break!",
-                    expected: "d5",
-                    wrong: [
-                      { move: "d6", response: "c3", msg: "d6 is too slow. It lets White defend with c3. Play d5 to blow open the center!" }
-                    ],
-                    response: "exd5",
-                    next: {
-                      prompt: "White captures. Play the brilliant in-between move to hit the Queen before recapturing the pawn.",
-                      expected: "Bg4",
-                      response: "f3",
-                      next: {
-                        prompt: "White blocks. Exploit the pin on the pawn and infiltrate with your central Knight!",
-                        expected: "Ne4",
-                        endpoint: "Brilliant! You've completely dismantled the Scholar's Mate. White's position collapses, and you hold a massive initiative."
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        id: 'scholars_mate_passive',
-        title: "Lesson 2: Break the Passive Defense",
-        description: "Counter White when they try to defend d4 with Ne2.",
-        startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4", // After 1. e4 e5 2. Qh5 Nc6 3. Bc4 g6 4. Qf3 Nf6
-        color: "b",
-        tree: {
-          prompt: "White plays Ne2 to defend the d4 square. Continue your kingside development by fianchettoing your Bishop.",
-          botFirst: "Ne2",
-          expected: "Bg7",
-          response: "d3",
-          next: {
-            prompt: "White opens the dark-squared bishop. Get your King to safety.",
-            expected: "O-O",
-            response: "Bg5",
-            next: {
-              prompt: "White tries to pin your Knight. Immediately ask the Bishop a question with your h-pawn.",
-              expected: "h6",
-              response: "Bh4",
-              next: {
-                prompt: "The Bishop retreats. Trap it and break the pin!",
-                expected: "g5",
-                response: "Bg3",
-                next: {
-                  prompt: "Now that the pin is broken, strike in the center with full force!",
-                  expected: "d5",
-                  endpoint: "Excellent! The center is blown open, and White's king is stranded. You have a completely winning position."
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        id: 'scholars_mate_sneaky',
-        title: "Lesson 3: The Sneaky Qf3 Line",
-        description: "What to do when White delays the Queen attack and brings it to f3 directly.",
-        startFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3", // After 1. e4 e5 2. Bc4 Nc6
-        color: "b",
-        tree: {
-          prompt: "White brings the Queen to f3 directly to eye f7 without playing Qh5 first. Defend f7 by developing your Knight.",
-          botFirst: "Qf3",
-          expected: "Nf6",
-          wrong: [
-            { move: "Bc5", response: "Qxf7#", msg: "Blunder! White plays Qxf7# Checkmate. Develop the Knight to f6 to block the Queen." }
-          ],
-          response: "c3",
-          next: {
-            prompt: "White plays c3 to prepare a center push. Immediately seize the initiative with a central pawn break!",
-            expected: "d5",
-            endpoint: "Perfect! You stop White's plans, challenge the center, and gain a clear positional edge."
-          }
-        }
-      }
-    ]
-  }
-];
 
 // ============================================================================
 // CAPS2 WIN PROBABILITY ALGORITHM
@@ -835,71 +716,22 @@ export default function App() {
             
             {/* Academy Mode */}
             {gameMode === 'academy' && (
-              <>
-                <div className="panel-header" style={{color: '#9C27B0'}}>
-                  <span style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                    {activeModule && <span style={{cursor:'pointer', color:'#aaa'}} onClick={() => {setActiveLesson(null); setActiveModule(null); setAcademyError(false); setShowHint(false);}}>←</span>}
-                    🎓 MoRN Academy
-                  </span>
-                  <span style={{cursor:'pointer', color:'#888'}} onClick={() => setIsVoiceMuted(!isVoiceMuted)}>
-                    {isVoiceMuted ? '🔇' : '🔊'}
-                  </span>
-                </div>
-                <div className="panel-content">
-                  {!activeModule ? (
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
-                      <p style={{color: '#aaa', margin: 0}}>Select a training module to begin:</p>
-                      {ACADEMY_MODULES.map(mod => (
-                        <div key={mod.id} className="lesson-card" onClick={() => openModule(mod)}>
-                          <div className="lesson-title">{mod.title}</div>
-                          <div style={{color: '#888', fontSize: '13px'}}>{mod.description}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : !activeLesson ? (
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
-                      <h3 style={{marginTop: 0, color: '#9C27B0'}}>{activeModule.title}</h3>
-                      <p style={{color: '#aaa', margin: 0}}>{activeModule.description}</p>
-                      {activeModule.lessons.map(lesson => (
-                        <button key={lesson.id} className="action-btn" style={{background: '#9C27B0', textAlign: 'left', padding: '15px'}} onClick={() => startLesson(lesson)}>
-                          {lesson.title}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
-                      <h3 style={{marginTop: 0, color: '#9C27B0'}}>{activeLesson.title}</h3>
-                      
-                      <div className={`coach-card ${academyError ? 'error' : ''}`}>
-                        <div className="coach-face" style={{background: "url('https://www.chess.com/bundles/web/images/coach/coach-anya.png') center/cover", width:'48px', height:'48px', borderRadius:'50%', minWidth: '48px'}}></div>
-                        <div className="coach-text">{academyMessage}</div>
-                      </div>
-
-                      {showHint && academyNode && (
-                        <div className="hint-box" style={{marginTop: '15px'}}>
-                          💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the orange arrow on the board).
-                        </div>
-                      )}
-
-                      <div style={{marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                        {academyError && (
-                          <button className="action-btn" style={{background: '#ca3431'}} onClick={undoAcademyMove}>
-                            ↩ Retry Move
-                          </button>
-                        )}
-                        {!academyError && academyNode && !academyNode.endpoint && (
-                          <button className="action-btn" style={{background: '#e58f2a'}} onClick={provideHint}>
-                            💡 Give me a Hint
-                          </button>
-                        )}
-                        <button className="action-btn" style={{background: '#333'}} onClick={() => { setActiveLesson(null); setAcademyError(false); setShowHint(false); }}>
-                          Back to Lessons
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
+              <AcademyPanel
+                activeModule={activeModule}
+                activeLesson={activeLesson}
+                academyError={academyError}
+                academyMessage={academyMessage}
+                academyNode={academyNode}
+                showHint={showHint}
+                isVoiceMuted={isVoiceMuted}
+                onToggleMute={() => setIsVoiceMuted(!isVoiceMuted)}
+                onOpenModule={openModule}
+                onStartLesson={startLesson}
+                onRetryMove={undoAcademyMove}
+                onProvideHint={provideHint}
+                onBackToModules={() => { setActiveLesson(null); setActiveModule(null); setAcademyError(false); setShowHint(false); }}
+                onBackToLessons={() => { setActiveLesson(null); setAcademyError(false); setShowHint(false); }}
+              />
             )}
 
             {/* Review Setup */}
