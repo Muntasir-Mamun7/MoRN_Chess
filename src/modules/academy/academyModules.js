@@ -18,6 +18,9 @@ export const ACADEMY_MODULES = [
           next: {
             prompt: "Qh5! The classic Scholar's Mate attempt. The e5 pawn is hanging. Do not panic. Defend it calmly by developing your Queenside Knight.",
             expected: "Nc6",
+            wrong: [
+              { move: "d6", response: "Bc4", msg: "While d6 defends the pawn, it blocks your dark-squared bishop. Nc6 is the most active and flexible defense!" }
+            ],
             response: "Bc4",
             next: {
               prompt: "Bc4. White is directly targeting f7. Checkmate is threatened! Do NOT play Nf6 to attack the Queen, as it falls for the trap. Block the Queen's path with your g-pawn.",
@@ -34,20 +37,26 @@ export const ACADEMY_MODULES = [
                 next: {
                   prompt: "White pushes g4 to kick your Knight away from defending. The best way to punish a flank attack is in the center! Jump your Knight forward to attack the Queen and aim at the c2 fork.",
                   expected: "Nd4",
+                  wrong: [
+                    { move: "d6", response: "g5", msg: "Too passive! White plays g5, kicking your Knight and renewing the attack. Counter-attack in the center with Nd4!" }
+                  ],
                   response: "Qd1",
                   next: {
-                    prompt: "The Queen retreats to safety. Now, DO NOT play the slow d6. Strike immediately! Blow open the center with an aggressive pawn break.",
+                    prompt: "The Queen retreats to safety. Now, DO NOT play the slow d6. Strike immediately! Blow open the center with an aggressive d-pawn break.",
                     expected: "d5",
                     wrong: [
-                      { move: "d6", response: "c3", msg: "d6 is too slow! It lets White play c3 to kick your Knight. Play d5 to blow open the center immediately!" }
+                      { move: "d6", response: "c3", msg: "d6 is too slow! It lets White play c3 to comfortably kick your Knight. Play d5 to blow open the center immediately!" }
                     ],
                     response: "exd5",
                     next: {
-                      prompt: "White captures the pawn. Don't recapture immediately! Play the brilliant in-between move (Zwischenzug) developing your Bishop to hit the Queen.",
-                      expected: "Bg4",
+                      prompt: "White captures the pawn. Don't recapture immediately! Play the brilliant in-between move (Zwischenzug) developing your Bishop to capture the g4 pawn and hit the Queen.",
+                      expected: "Bxg4",
+                      wrong: [
+                        { move: "Nxd5", response: "c3", msg: "Recapturing allows White to stabilize with c3. Keep the initiative! Take the g4 pawn with your Bishop to attack the Queen." }
+                      ],
                       response: "f3",
                       next: {
-                        prompt: "White blocks the attack with f3. Now, ignore your Bishop! Exploit the pin on the f3 pawn and infiltrate the center with your other Knight!",
+                        prompt: "White blocks the attack with f3. Now, ignore your Bishop! Exploit the pin on the f3 pawn and infiltrate the center with your other Knight to e4!",
                         expected: "Ne4",
                         response: "fxg4",
                         next: {
@@ -57,7 +66,7 @@ export const ACADEMY_MODULES = [
                           next: {
                             prompt: "The King is trapped on f1. Deliver the final blow with your Queen, perfectly protected by your Knight!",
                             expected: "Qf2#",
-                            endpoint: "Absolutely brilliant! You turned White's early aggression into a spectacular, forced checkmate. Excellent calculation."
+                            endpoint: "Absolutely brilliant! You turned White's early aggression into a spectacular, forced checkmate. Excellent calculation!"
                           }
                         }
                       }
@@ -130,11 +139,19 @@ export const ACADEMY_MODULES = [
                                 next: {
                                   prompt: "White grabs the pawn, but their King is stuck in the center. Skewer the King and Queen with your Rook!",
                                   expected: "Re8+",
+                                  wrong: [
+                                    { move: "Bxf3", response: "gxf3", msg: "Taking the Knight is okay, but Re8+ immediately exposes the uncastled King and wins the game!" }
+                                  ],
                                   response: "Kd2",
                                   next: {
-                                    prompt: "The King steps to d2. Keep the initiative flowing! Develop your last minor piece and attack the Queen again with Ne4.",
+                                    prompt: "The King steps to d2. Keep the initiative flowing! Develop your last minor piece and launch a discovered attack on the Queen with Ne4+.",
                                     expected: "Ne4+",
-                                    endpoint: "Phenomenal! White's King is caught in a crossfire, and their Queen is completely misplaced. You have total domination and will win material shortly."
+                                    response: "dxe4",
+                                    next: {
+                                      prompt: "White captures the Knight. Now capture their hanging Queen with your dark-squared Bishop!",
+                                      expected: "Bxd4",
+                                      endpoint: "Phenomenal! White's King was caught in a crossfire, and you successfully won their Queen. You have total domination."
+                                    }
                                   }
                                 }
                               }
@@ -186,13 +203,28 @@ export const ACADEMY_MODULES = [
                     expected: "Ne5",
                     response: "Bb3",
                     next: {
-                      prompt: "The Bishop retreats. Your Knight on e5 is a powerhouse. Solidify your center by developing your light-squared Bishop.",
+                      prompt: "The Bishop retreats. Your Knight on e5 is a powerhouse. Solidify your center by developing your light-squared Bishop to g4 to attack the Queen.",
                       expected: "Bg4",
                       response: "f3",
                       next: {
                         prompt: "White challenges the Bishop. Retreat it safely to h5, keeping the pressure on the dark squares.",
                         expected: "Bh5",
-                        endpoint: "Perfect! Your Knight on e5 restricts White entirely. Their opening trick has backfired, and you control the entire board."
+                        response: "g4",
+                        next: {
+                          prompt: "White aggressively pushes g4. Sacrifice your Knight for two pawns to expose the White King! Play Nfxg4.",
+                          expected: "Nfxg4",
+                          response: "fxg4",
+                          next: {
+                            prompt: "White accepts the sacrifice. Now bring your Queen out with a vicious check!",
+                            expected: "Qh4+",
+                            response: "Kf1",
+                            next: {
+                              prompt: "The King is trapped. Now capture the g4 pawn with your Bishop, creating overwhelming pressure.",
+                              expected: "Bxg4",
+                              endpoint: "Perfect! Your Knight sacrifice completely exposed White's King. Their opening trick has backfired entirely, and you have a crushing attack."
+                            }
+                          }
+                        }
                       }
                     }
                   }
@@ -238,6 +270,9 @@ export const ACADEMY_MODULES = [
                   next: {
                     prompt: "Develop your Queenside Knight to d2. This uniquely supports your e-pawn without blocking your c-pawn.",
                     expected: "Nbd2",
+                    wrong: [
+                      { move: "Nc3", response: "d4", msg: "Nc3 allows Black to push d4, kicking your Knight. Nbd2 is much safer!" }
+                    ],
                     response: "Be7",
                     next: {
                       prompt: "The defensive shell is complete! Now, strike in the center with your e-pawn to gain space.",
@@ -266,7 +301,17 @@ export const ACADEMY_MODULES = [
                                 next: {
                                   prompt: "Black prepares a b4 push. Swing your Knight to h2, preparing to jump to g4. The attack is unstoppable!",
                                   expected: "N1h2",
-                                  endpoint: "Masterful! The center is closed, and you are perfectly positioned to launch a vicious pawn storm and piece sacrifice against the Black King."
+                                  response: "a5",
+                                  next: {
+                                    prompt: "Jump the Knight into the attack!",
+                                    expected: "Ng4",
+                                    response: "a4",
+                                    next: {
+                                      prompt: "Black pushes a4. Ignore the queenside! Play a3 to stop them from advancing further, securing your structure.",
+                                      expected: "a3",
+                                      endpoint: "Masterful! The center is closed, and you are perfectly positioned to launch a vicious pawn storm and piece sacrifice against the Black King."
+                                    }
+                                  }
                                 }
                               }
                             }
@@ -342,7 +387,17 @@ export const ACADEMY_MODULES = [
                               next: {
                                 prompt: "Execute the famous Mar del Plata Rook lift! Bring your Rook to f6, preparing to swing to g6 or h6.",
                                 expected: "Rf6",
-                                endpoint: "Excellent! You've achieved the ultimate King's Indian Defense attacking formation. Your pawn storm will completely overwhelm the White King."
+                                response: "c5",
+                                next: {
+                                  prompt: "White strikes on the queenside. Swing your Rook over to g6 to prepare the final assault.",
+                                  expected: "Rg6",
+                                  response: "Rc1",
+                                  next: {
+                                    prompt: "Develop your Queenside Knight to d7 to fortify your structure.",
+                                    expected: "Nd7",
+                                    endpoint: "Excellent! You've achieved the ultimate King's Indian Defense attacking formation. Your pawn storm will completely overwhelm the White King."
+                                  }
+                                }
                               }
                             }
                           }
@@ -409,7 +464,17 @@ export const ACADEMY_MODULES = [
                           next: {
                             prompt: "White pushes past. Jump your Knight to d7, safely routing it while opening lines for your Bishop.",
                             expected: "Nfd7",
-                            endpoint: "Great job! You navigated the dangerous 150 Attack perfectly. It is now a race: White attacks the kingside, but your queenside attack is extremely fast and potent."
+                            response: "Nh3",
+                            next: {
+                              prompt: "Strike at the center with c5! The queenside storm is in full effect.",
+                              expected: "c5",
+                              response: "dxc5",
+                              next: {
+                                prompt: "White takes. Recapture with the d-pawn to open up lines.",
+                                expected: "dxc5",
+                                endpoint: "Great job! You navigated the dangerous 150 Attack perfectly. It is now a race: White attacks the kingside, but your queenside attack is extremely fast and potent."
+                              }
+                            }
                           }
                         }
                       }
@@ -489,7 +554,17 @@ export const ACADEMY_MODULES = [
                                 next: {
                                   prompt: "Black jumps into the center. Undermine their position by challenging the f6 square. Play Ng5!",
                                   expected: "Ng5",
-                                  endpoint: "Excellent! Your Knight is a monster on e5. You are perfectly placed to launch a kingside attack while keeping the center fully locked."
+                                  response: "f6",
+                                  next: {
+                                    prompt: "Black attacks the Knight. Ignore it! Sacrifice the Knight by capturing on e6 to fork the Queen and Rook!",
+                                    expected: "Nxe6",
+                                    response: "Qc8",
+                                    next: {
+                                      prompt: "The Queen moves. Capture the Rook on f8!",
+                                      expected: "Nxf8",
+                                      endpoint: "Excellent! Your Knight is a monster on e5. You successfully navigated the complications and won an exchange!"
+                                    }
+                                  }
                                 }
                               }
                             }
@@ -572,7 +647,17 @@ export const ACADEMY_MODULES = [
                                     next: {
                                       prompt: "Black recaptures. Now jump your other Knight to f3! It is headed for g5.",
                                       expected: "Nf3",
-                                      endpoint: "Brilliant! From here, Black is suffocating. The Knight jumps to g5, and your attack down the g and h files is completely unstoppable."
+                                      response: "c4",
+                                      next: {
+                                        prompt: "Black attacks the Bishop. Retreat it safely to c2.",
+                                        expected: "Bc2",
+                                        response: "Nc5",
+                                        next: {
+                                          prompt: "Black centralizes. Castle queenside to bring your final Rook into the game!",
+                                          expected: "O-O-O",
+                                          endpoint: "Brilliant! From here, Black is suffocating. The Knight jumps to g5, and your attack down the g and h files is completely unstoppable."
+                                        }
+                                      }
                                     }
                                   }
                                 }
@@ -637,7 +722,22 @@ export const ACADEMY_MODULES = [
                           next: {
                             prompt: "Black grabs the a-pawn, hoping to escape. Trap the Queen by taking on b7!",
                             expected: "Rxb7",
-                            endpoint: "Incredible! Because you delayed Nf3, the traditional trap failed entirely. You are up a full piece and completely winning."
+                            response: "Qa1+",
+                            next: {
+                              prompt: "Black delivers a spite check. Block with your Queen on b1.",
+                              expected: "Qb1",
+                              response: "Qxc3",
+                              next: {
+                                prompt: "Black grabs another pawn. Defend your d-pawn by developing the Knight to e2.",
+                                expected: "Ne2",
+                                response: "Qa5",
+                                next: {
+                                  prompt: "The Queen retreats. Chase it with your dark-squared Bishop to c7!",
+                                  expected: "Bc7",
+                                  endpoint: "Incredible! Because you delayed Nf3, the traditional trap failed entirely. You are up a full piece and completely winning."
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -698,7 +798,8 @@ export const ACADEMY_MODULES = [
                             prompt: "Black's Knight jumps to e4. This is a massive blunder! Trade Queens to remove their defense of the c7 square.",
                             expected: "Qxd8",
                             wrong: [
-                              { move: "Nf3", response: "Qa5+", msg: "Too slow! Black plays Qa5+ and you lose the initiative. Capture the Queen on d8!" }
+                              { move: "Nf3", response: "Qa5+", msg: "Too slow! Black plays Qa5+ and you lose the initiative. Capture the Queen on d8!" },
+                              { move: "Qe3", response: "Qa5+", msg: "You must trade Queens to remove the defense of c7!" }
                             ],
                             response: "Rxd8",
                             next: {
@@ -706,8 +807,11 @@ export const ACADEMY_MODULES = [
                               expected: "Nc7",
                               response: "Rb8",
                               next: {
-                                prompt: "The Rook runs away. Simply grab the Knight on e4 with your Bishop!",
-                                expected: "Bxe5",
+                                prompt: "The Rook runs away. Now capture the Knight on e4 with your f-pawn to win a full piece!",
+                                expected: "fxe4",
+                                wrong: [
+                                  { move: "Bxe5", response: "Nxe5", msg: "Don't trade the Bishop! Win the Knight cleanly with fxe4." }
+                                ],
                                 endpoint: "Crushing! You have successfully executed the legendary Jobava trap. Black is completely lost!"
                               }
                             }
