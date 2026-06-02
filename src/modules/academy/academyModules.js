@@ -114,3 +114,128 @@ export const ACADEMY_MODULES = [
     ]
   }
 ];
+
+{
+    id: 'kings_indian_module',
+    title: "The King's Indian Setup",
+    description: "Learn the universal, aggressive King's Indian system for both White and Black, as taught by GothamChess.",
+    lessons: [
+      {
+        id: 'kings_indian_attack_white',
+        title: "Lesson 1: King's Indian Attack (White)",
+        description: "Learn the universal setup for White. Develop safely and prepare a powerful center strike.",
+        startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        color: "w",
+        tree: {
+          prompt: "Let's build the King's Indian Attack. Start by developing your Kingside Knight.",
+          expected: "Nf3",
+          response: "d5",
+          next: {
+            prompt: "Black grabs the center. Prepare to fianchetto your Bishop on the kingside.",
+            expected: "g3",
+            response: "c5",
+            next: {
+              prompt: "Put your Bishop on the long diagonal.",
+              expected: "Bg2",
+              response: "Nc6",
+              next: {
+                prompt: "Get your King to safety.",
+                expected: "O-O",
+                response: "e6",
+                next: {
+                  prompt: "Now play the key anti-attack move. Play d3 to control the center and support future pawn pushes.",
+                  expected: "d3",
+                  response: "Nf6",
+                  next: {
+                    prompt: "Develop your Queenside Knight to d2. This supports your e-pawn without blocking the c-pawn.",
+                    expected: "Nbd2",
+                    response: "Be7",
+                    next: {
+                      prompt: "The setup is complete! Strike in the center with your e-pawn.",
+                      expected: "e4",
+                      endpoint: "Perfect! You have reached the core King's Indian Attack setup. From here, you can maneuver your Knight (Nh4 or Ne1) and launch a fierce f4 pawn storm."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'kings_indian_defense_black',
+        title: "Lesson 2: King's Indian Defense vs d4",
+        description: "Learn the classic King's Indian Defense structure against a d4 opening.",
+        startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+        color: "b",
+        tree: {
+          prompt: "White opens with 1. d4. Begin the King's Indian Defense by developing your Knight.",
+          botFirst: "d4",
+          expected: "Nf6",
+          response: "c4",
+          next: {
+            prompt: "White builds a strong center. Prepare your fianchetto.",
+            expected: "g6",
+            response: "Nc3",
+            next: {
+              prompt: "Put your Bishop on the long diagonal.",
+              expected: "Bg7",
+              response: "e4",
+              next: {
+                prompt: "White takes the full center! Prevent them from pushing e5 and attacking your knight by playing your d-pawn.",
+                expected: "d6",
+                wrong: [
+                  { move: "O-O", response: "e5", msg: "Inaccuracy. White will push e5 and crush your position. Play d6 first to stop the e-pawn!" }
+                ],
+                response: "Nf3",
+                next: {
+                  prompt: "Tuck your King safely away.",
+                  expected: "O-O",
+                  response: "Be2",
+                  next: {
+                    prompt: "The core setup is complete. Now strike back at the center!",
+                    expected: "e5",
+                    endpoint: "Excellent! You've achieved the classic King's Indian Defense. Once the center locks, plan to move your Knight to e8 or h5 and launch the f5 attack!"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'kings_indian_pirc_black',
+        title: "Lesson 3: The Pirc Defense vs e4",
+        description: "How to adapt the King's Indian setup against 1. e4 and counter the aggressive 150 Attack.",
+        startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+        color: "b",
+        tree: {
+          prompt: "White plays 1. e4. If you play Nf6 immediately, they will push e5. Prevent this by playing your d-pawn first (The Pirc Defense).",
+          botFirst: "e4",
+          expected: "d6",
+          wrong: [
+            { move: "Nf6", response: "e5", msg: "Mistake! Against e4, playing Nf6 immediately allows the annoying e5 push (Alekhine's Defense). Play d6 first!" }
+          ],
+          response: "d4",
+          next: {
+            prompt: "White grabs the center. Now it's safe to develop your Knight.",
+            expected: "Nf6",
+            response: "Nc3",
+            next: {
+              prompt: "Prepare your fianchetto.",
+              expected: "g6",
+              response: "Be3",
+              next: {
+                prompt: "Watch out! White is preparing Qd2 to trade off your dark-squared bishop and attack your King. Delay castling and start queenside expansion with your a-pawn!",
+                expected: "a6",
+                wrong: [
+                  { move: "O-O", response: "Qd2", msg: "Inaccuracy. Castling into White's aggressive Be3/Qd2 setup is dangerous. Play a6 to start a counter-attack first!" }
+                ],
+                endpoint: "Great job! By playing a6 (and later b5), you create massive queenside counterplay against aggressive setups, keeping your King safe for now."
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
