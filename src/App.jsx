@@ -36,14 +36,45 @@ const playSound = (isCapture, isMuted) => {
   new Audio(url).play().catch(() => {});
 };
 
-// Helper for Hint Arrows
-function getExpectedCoords(fen, expectedSan) {
+// ============================================================================
+// CHESS.COM STYLE ARROW GENERATOR (Green & L-Shaped Knights)
+// ============================================================================
+const CHESS_COM_GREEN = 'rgba(129, 182, 76, 0.8)';
+
+function generateArrows(fen, moveSanOrLan) {
+  if (!fen || !moveSanOrLan) return [];
+  const game = new Chess(fen);
   try {
-    const temp = new Chess(fen);
-    const m = temp.move(expectedSan);
-    if (m) return { from: m.from, to: m.to };
-  } catch (e) {}
-  return null;
+    const move = game.move(moveSanOrLan);
+    if (!move) return [];
+
+    // If the piece is a Knight, calculate the L-shape (elbow)
+    if (move.piece === 'n') {
+      const fromFile = move.from.charAt(0);
+      const fromRank = move.from.charAt(1);
+      const toFile = move.to.charAt(0);
+      const toRank = move.to.charAt(1);
+
+      let elbow = '';
+      // If moving 2 squares vertically, elbow is on the same file as 'from'
+      if (Math.abs(parseInt(fromRank) - parseInt(toRank)) === 2) {
+        elbow = fromFile + toRank;
+      } else {
+        // If moving 2 squares horizontally, elbow is on the same file as 'to'
+        elbow = toFile + fromRank;
+      }
+
+      return [
+        [move.from, elbow, CHESS_COM_GREEN],
+        [elbow, move.to, CHESS_COM_GREEN]
+      ];
+    }
+
+    // Default straight arrow for all other pieces
+    return [[move.from, move.to, CHESS_COM_GREEN]];
+  } catch (e) {
+    return [];
+  }
 }
 
 // ============================================================================
@@ -146,7 +177,7 @@ export default function App() {
   const [academyMessage, setAcademyMessage] = useState('');
   const [academyError, setAcademyError] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [safeFen, setSafeFen] = useState(''); // Essential for precise Undo/Retry
+  const [safeFen, setSafeFen] = useState(''); 
   
   // Board Interaction State
   const [moveFrom, setMoveFrom] = useState('');
@@ -239,7 +270,7 @@ export default function App() {
   }, []);
 
   // --------------------------------------------------------
-  // Academy Mode Logic (With Interactive Punishment)
+  // Academy Mode Logic
   // --------------------------------------------------------
   function openModule(mod) {
     setActiveModule(mod);
@@ -569,6 +600,20 @@ export default function App() {
     return `${((clamped + 500) / 1000) * 100}%`;
   }, [evalRaw]);
 
+  // Calculate dynamic arrows using the CHESS_COM_GREEN logic
+  const activeArrows = useMemo(() => {
+    if (gameMode === 'review' && currentReviewIndex >= 0 && !isViewingAlt) {
+       const move = reviewMoves[currentReviewIndex];
+       if (move && move.bestMoveLAN && ["Blunder", "Mistake", "Inaccuracy", "Miss"].includes(move.classification)) {
+         return generateArrows(move.fenBefore, move.bestMoveLAN);
+       }
+    }
+    if (gameMode === 'academy' && showHint && academyNode) {
+       return generateArrows(safeFen || game.fen(), academyNode.expected);
+    }
+    return [];
+  }, [gameMode, currentReviewIndex, isViewingAlt, reviewMoves, showHint, academyNode, game, safeFen]);
+
   const activeSquareStyles = useMemo(() => {
     let styles = { ...optionSquares };
     if (gameMode === 'review' && currentReviewIndex >= 0 && !isViewingAlt) {
@@ -578,22 +623,6 @@ export default function App() {
     }
     return styles;
   }, [optionSquares, gameMode, currentReviewIndex, isViewingAlt, reviewMoves]);
-
-  const activeArrows = useMemo(() => {
-    if (gameMode === 'review' && currentReviewIndex >= 0 && !isViewingAlt) {
-       const move = reviewMoves[currentReviewIndex];
-       if (move && move.bestMoveLAN && ["Blunder", "Mistake", "Inaccuracy", "Miss"].includes(move.classification)) {
-         return [[move.bestMoveLAN.substring(0, 2), move.bestMoveLAN.substring(2, 4), "rgba(129, 182, 76, 0.8)"]];
-       }
-    }
-    if (gameMode === 'academy' && showHint && academyNode) {
-       const coords = getExpectedCoords(safeFen || game.fen(), academyNode.expected);
-       if (coords) {
-         return [[coords.from, coords.to, "rgba(255, 170, 0, 0.8)"]];
-       }
-    }
-    return [];
-  }, [gameMode, currentReviewIndex, isViewingAlt, reviewMoves, showHint, academyNode, game, safeFen]);
 
   return (
     <>
@@ -625,16 +654,6 @@ export default function App() {
         .action-btn { width: 100%; padding: 14px; background: #d32f2f; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 15px; }
         .action-btn:hover { filter: brightness(1.1); }
         .action-btn:disabled { background: #555; cursor: not-allowed; }
-
-        /* Academy UI */
-        .coach-card { background: #2a2a2a; border-left: 4px solid #81b64c; padding: 15px; border-radius: 6px; display: flex; gap: 15px; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .coach-card.error { border-left-color: #ca3431; }
-        .coach-text { font-size: 15px; line-height: 1.5; color: #eee; flex: 1; }
-        .hint-box { background: rgba(255, 255, 0, 0.1); border: 1px solid rgba(255, 255, 0, 0.3); color: #ffd700; padding: 10px; border-radius: 6px; font-size: 13px; font-weight: bold; }
-
-        .lesson-card { background: #262421; border: 1px solid #333; border-radius: 8px; padding: 15px; cursor: pointer; transition: 0.2s; }
-        .lesson-card:hover { border-color: #81b64c; background: #2b2926; }
-        .lesson-title { color: #81b64c; font-weight: bold; font-size: 16px; margin-bottom: 5px; }
         
         /* Summary Grid */
         .acc-grid { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #403d39; padding-bottom: 20px; }
@@ -653,6 +672,13 @@ export default function App() {
         .move-cell:hover { background: #312e2b; }
         .move-cell.active { background: #403d39; color: #fff; }
         .graph-area { height: 60px; background: #1e1e1e; border-top: 1px solid #403d39; position: relative; }
+
+        .nav-bar { display: flex; background: #262421; padding: 15px; gap: 5px; align-items: center; border-top: 1px solid #403d39; }
+        .nav-btn { flex: 1; background: #312e2b; border: none; color: #a59f97; padding: 12px 0; border-radius: 6px; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        .nav-btn:hover:not(:disabled) { background: #403d39; color: #fff; }
+        .nav-btn:disabled { opacity: 0.5; }
+        .nav-play { flex: 2; background: #81b64c; color: #fff; font-weight: bold; }
+        .nav-play:hover { background: #96bc4b; }
 
         @media (max-width: 768px) {
           .main-layout { flex-direction: column; align-items: center; }
@@ -695,7 +721,7 @@ export default function App() {
                 onSquareClick={handleSquareClick}
                 customSquareStyles={activeSquareStyles}
                 customArrows={activeArrows.map(arr => [arr[0], arr[1]])}
-                customArrowColor={activeArrows.length > 0 ? activeArrows[0][2] : "rgba(129, 182, 76, 0.8)"}
+                customArrowColor={activeArrows.length > 0 ? activeArrows[0][2] : CHESS_COM_GREEN}
                 customDarkSquareStyle={{ backgroundColor: currentTheme.dark }}
                 customLightSquareStyle={{ backgroundColor: currentTheme.light }}
                 animationDuration={250}
@@ -799,12 +825,12 @@ export default function App() {
                 <div className="panel-header" style={{color: '#2196F3'}}>★ Game Review</div>
                 <div className="panel-content">
                   <div style={{display: 'flex', flexDirection: 'column'}}>
-                    <div className="coach-card" style={{borderLeftColor: '#2196F3'}}>
-                      <div className="coach-face" style={{minWidth: '48px'}}></div>
-                      <div className="coach-text">Here is your full game report. Let's review the key moments!</div>
+                    <div style={{background: '#2a2a2a', borderLeft: '4px solid #2196F3', padding: '15px', borderRadius: '6px', display: 'flex', gap: '15px', alignItems: 'center'}}>
+                      <div style={{background: "url('https://www.chess.com/bundles/web/images/coach/coach-anya.png') center/cover", width: '48px', height: '48px', borderRadius: '50%', minWidth: '48px'}}></div>
+                      <div style={{fontSize: '15px', lineHeight: '1.5', color: '#eee', flex: 1}}>Here is your full game report. Let's review the key moments!</div>
                     </div>
                     
-                    <div className="acc-grid">
+                    <div className="acc-grid" style={{marginTop: '20px'}}>
                       <div className="acc-col">
                         <div style={{color: '#a59f97', fontSize: '13px'}}>{userColor === 'w' ? 'You' : 'Opponent'} (White)</div>
                         <div className="acc-box">{summaryData.wAcc}</div>
@@ -867,8 +893,8 @@ export default function App() {
               <>
                 <div className="panel-header" style={{color: '#2196F3'}}>★ Game Review</div>
                 <div style={{padding: '20px', flex: 1, display: 'flex', flexDirection: 'column'}}>
-                  <div className="coach-card" style={{borderLeftColor: COLORS[currentMove.classification] || '#81b64c'}}>
-                    <div className="coach-face" style={{minWidth: '48px'}}></div>
+                  <div style={{background: '#2a2a2a', borderLeft: `4px solid ${COLORS[currentMove.classification] || '#81b64c'}`, padding: '15px', borderRadius: '6px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.3)', marginBottom: '15px'}}>
+                    <div style={{background: "url('https://www.chess.com/bundles/web/images/coach/coach-anya.png') center/cover", width: '48px', height: '48px', borderRadius: '50%', minWidth: '48px'}}></div>
                     <div style={{display: 'flex', flexDirection: 'column', gap: '5px', flex: 1}}>
                       <div style={{fontWeight: 'bold', color: COLORS[currentMove.classification] || '#81b64c', display: 'flex', alignItems: 'center', gap: '8px'}}>
                         <span className="stat-icon" style={{background: COLORS[currentMove.classification] || '#81b64c', display: 'inline-flex'}}>
