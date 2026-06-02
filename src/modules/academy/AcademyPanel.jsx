@@ -17,6 +17,11 @@ export default function AcademyPanel({
   onBackToModules,
   onBackToLessons
 }) {
+  
+  // Find the index of the current lesson to find the "Next" one
+  const currentLessonIndex = activeModule?.lessons.findIndex(l => l.id === activeLesson?.id);
+  const nextLesson = activeModule?.lessons[currentLessonIndex + 1];
+
   return (
     <>
       <div className="panel-header" style={{ color: '#9C27B0' }}>
@@ -58,9 +63,23 @@ export default function AcademyPanel({
               <div className="coach-text">{academyMessage}</div>
             </div>
 
+            {/* If drill is finished, show transition buttons */}
+            {!academyNode && (
+               <div style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button className="action-btn" style={{ background: '#81b64c' }} onClick={() => onStartLesson(activeLesson)}>
+                    🔄 Re-play This Drill
+                  </button>
+                  {nextLesson && (
+                    <button className="action-btn" style={{ background: '#9C27B0' }} onClick={() => onStartLesson(nextLesson)}>
+                      ➡️ Practice Next Drill
+                    </button>
+                  )}
+               </div>
+            )}
+
             {showHint && academyNode && (
               <div className="hint-box" style={{ marginTop: '15px' }}>
-                💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the green arrow on the board).
+                💡 Hint: Try playing <strong>{academyNode.expected}</strong>. (Follow the green arrow).
               </div>
             )}
 
