@@ -238,78 +238,96 @@ export const ACADEMY_MODULES = [
   },
   {
     id: 'kings_indian_module',
-    title: "The King's Indian Setup",
-    description: "Master the universal, aggressive King's Indian system for both White and Black, deep into the middlegame.",
+    title: "The King's Indian Defense (KID)",
+    description: "Learn the deepest lines of the true King's Indian Defense. Master the Mar del Plata pawn storms and crush the Sämisch variation.",
     lessons: [
       {
-        id: 'kings_indian_attack_white',
-        title: "Lesson 1: King's Indian Attack (White)",
-        description: "Learn the universal setup for White. Develop safely and prepare a powerful center strike.",
+        id: 'kid_mar_del_plata',
+        title: "Lesson 1: The Mar del Plata Pawn Storm",
+        description: "The classic KID attack. Lock the center, launch a devastating kingside pawn storm, and execute a brilliant rook lift.",
         startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        color: "w",
+        color: "b",
         tree: {
-          prompt: "Let's build the King's Indian Attack! This setup can be played against almost anything. Start by developing your Kingside Knight.",
-          expected: "Nf3",
-          response: "d5",
+          prompt: "White opens with 1. d4. Begin the King's Indian Defense by developing your Kingside Knight.",
+          botFirst: "d4",
+          expected: "Nf6",
+          response: "c4",
           next: {
-            prompt: "Black grabs the center. That's fine. Prepare to fianchetto your Bishop on the kingside.",
-            expected: "g3",
-            response: "c5",
+            prompt: "White takes space. Prepare your fianchetto.",
+            expected: "g6",
+            response: "Nc3",
             next: {
-              prompt: "Put your Bishop on the long diagonal to control the center from afar.",
-              expected: "Bg2",
-              response: "Nc6",
+              prompt: "Develop your Bishop to the long diagonal.",
+              expected: "Bg7",
+              response: "e4",
               next: {
-                prompt: "Get your King to absolute safety before launching any attacks.",
-                expected: "O-O",
-                response: "e6",
+                prompt: "White grabs the full center. You MUST play d6 here to prevent them from pushing e5 and destroying your position.",
+                expected: "d6",
+                wrong: [
+                  { move: "O-O", response: "e5", msg: "Inaccuracy. White pushes e5 immediately, dislodging your knight and crushing your position. You must play d6 first!" },
+                  { move: "e5", response: "dxe5", msg: "Mistake. You lose a pawn and your structure collapses if you push e5 before d6." }
+                ],
+                response: "Nf3",
                 next: {
-                  prompt: "Crucial step: Play the anti-attack move. Play d3 to control the center and prevent Black from pushing their pawns into your territory.",
-                  expected: "d3",
-                  response: "Nf6",
+                  prompt: "Now that the e5 push is prevented, tuck your King safely away.",
+                  expected: "O-O",
+                  response: "Be2",
                   next: {
-                    prompt: "Develop your Queenside Knight to d2. This uniquely supports your e-pawn without blocking your c-pawn.",
-                    expected: "Nbd2",
-                    wrong: [
-                      { move: "Nc3", response: "d4", msg: "Nc3 allows Black to push d4, kicking your Knight. Nbd2 is much safer!" }
-                    ],
-                    response: "Be7",
+                    prompt: "The core setup is complete. Now it is time to strike back at the center. Challenge d4!",
+                    expected: "e5",
+                    response: "O-O",
                     next: {
-                      prompt: "The defensive shell is complete! Now, strike in the center with your e-pawn to gain space.",
-                      expected: "e4",
-                      response: "O-O",
+                      prompt: "White castles. Develop your Queenside Knight to c6 to put maximum pressure on d4.",
+                      expected: "Nc6",
+                      response: "d5",
                       next: {
-                        prompt: "Black castles. To prepare a massive kingside attack, slide your Rook to e1 to support the e5 push.",
-                        expected: "Re1",
-                        response: "b6",
+                        prompt: "White pushes d5, closing the center. This is the Mar del Plata! Now you must attack the flank. Re-route your Knight to e7.",
+                        expected: "Ne7",
+                        wrong: [
+                          { move: "Nb8", response: "Ne1", msg: "Nb8 is too passive. Ne7 prepares to support the kingside pawn storm!" }
+                        ],
+                        response: "Ne1",
                         next: {
-                          prompt: "Black expands on the queenside. Advance your e-pawn to kick the Knight and lock the center!",
-                          expected: "e5",
-                          response: "Nd7",
+                          prompt: "White prepares queenside expansion with c5. Re-route your other Knight to d7 to defend c5 and prepare the f-pawn push.",
+                          expected: "Nd7",
+                          response: "Nd3",
                           next: {
-                            prompt: "Now the real magic: re-route your f3 Knight to f1! This prepares to swing it to h2 or g5, and clears the path for your f-pawn to attack.",
-                            expected: "Nf1",
-                            response: "Bb7",
+                            prompt: "White is readying c5. Launch the thematic King's Indian pawn break: f5!",
+                            expected: "f5",
+                            response: "f3",
                             next: {
-                              prompt: "Black continues queenside development. Start expanding your kingside space. Push h4!",
-                              expected: "h4",
-                              response: "Rc8",
+                              prompt: "White defends the e4 pawn. Lock the kingside by pushing f4 to entomb White's Bishop!",
+                              expected: "f4",
+                              wrong: [
+                                { move: "fxe4", response: "fxe4", msg: "Do not open lines for White's pieces! Keep the center locked to build your pawn storm." }
+                              ],
+                              response: "Bd2",
                               next: {
-                                prompt: "Develop your dark-squared Bishop to f4 to support the center and eye the kingside.",
-                                expected: "Bf4",
-                                response: "b5",
+                                prompt: "White continues their queenside plan. Continue your pawn storm. Push g5!",
+                                expected: "g5",
+                                response: "c5",
                                 next: {
-                                  prompt: "Black prepares a b4 push. Swing your Knight to h2, preparing to jump to g4. The attack is unstoppable!",
-                                  expected: "N1h2",
-                                  response: "a5",
+                                  prompt: "White attacks the queenside. Ignore it! Move your Knight to g6 to support the h5 and g4 pushes.",
+                                  expected: "Ng6",
+                                  response: "Rc1",
                                   next: {
-                                    prompt: "Jump the Knight into the attack!",
-                                    expected: "Ng4",
-                                    response: "a4",
+                                    prompt: "White prepares to breach c7. Re-route your d7 Knight to f6 to join the kingside assault.",
+                                    expected: "Nf6",
+                                    response: "b4",
                                     next: {
-                                      prompt: "Black pushes a4. Ignore the queenside! Play a3 to stop them from advancing further, securing your structure.",
-                                      expected: "a3",
-                                      endpoint: "Masterful! The center is closed, and you are perfectly positioned to launch a vicious pawn storm and piece sacrifice against the Black King."
+                                      prompt: "The race is on! Push h5 to prepare the ultimate g4 break.",
+                                      expected: "h5",
+                                      response: "h3",
+                                      next: {
+                                        prompt: "White tries to slow you down. Execute the legendary Mar del Plata Rook lift! Bring your Rook to f7.",
+                                        expected: "Rf7",
+                                        response: "a4",
+                                        next: {
+                                          prompt: "Play Bf8 to defend c7 and allow your Rook to swing to g7.",
+                                          expected: "Bf8",
+                                          endpoint: "Masterpiece! You have constructed the ultimate King's Indian attacking machine. You will swing your Rook to g7, play g4, sacrifice a Knight if needed, and hunt down the White King!"
+                                        }
+                                      }
                                     }
                                   }
                                 }
@@ -327,76 +345,67 @@ export const ACADEMY_MODULES = [
         }
       },
       {
-        id: 'kings_indian_defense_black',
-        title: "Lesson 2: King's Indian Defense vs d4",
-        description: "Learn the classic King's Indian Defense structure against a d4 opening, preparing the f5 pawn break.",
+        id: 'kid_samisch',
+        title: "Lesson 2: Crushing the Sämisch",
+        description: "White plays f3 early to stop your kingside storm. Shift gears and blast open the center with the c5 break.",
         startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         color: "b",
         tree: {
-          prompt: "White opens with 1. d4. Begin the King's Indian Defense by developing your Knight.",
+          prompt: "Play 1. d4.",
           botFirst: "d4",
           expected: "Nf6",
           response: "c4",
           next: {
-            prompt: "White builds a massive strong center. Prepare your fianchetto to counter it from a distance.",
+            prompt: "Play g6.",
             expected: "g6",
             response: "Nc3",
             next: {
-              prompt: "Put your Bishop on the long diagonal.",
+              prompt: "Play Bg7.",
               expected: "Bg7",
               response: "e4",
               next: {
-                prompt: "White takes the full center! You MUST prevent them from pushing e5 and attacking your knight. Play your d-pawn to block it.",
+                prompt: "Play d6 to secure the center.",
                 expected: "d6",
-                wrong: [
-                  { move: "O-O", response: "e5", msg: "Inaccuracy. White pushes e5 immediately, dislodging your knight and crushing your position. You must play d6 first!" },
-                  { move: "e5", response: "dxe5", msg: "Mistake. You lose a pawn and your structure collapses if you push e5 before d6." }
-                ],
-                response: "Nf3",
+                response: "f3",
                 next: {
-                  prompt: "Now that the e5 push is prevented, tuck your King safely away.",
+                  prompt: "Aha! The Sämisch Variation. White plays f3 to completely blunt your kingside pawn storm. Castle your King.",
                   expected: "O-O",
-                  response: "Be2",
+                  response: "Be3",
                   next: {
-                    prompt: "The core setup is complete. Now it is time to strike back at the center. Challenge d4!",
-                    expected: "e5",
+                    prompt: "White develops aggressively. Since a kingside attack won't work well here, we strike differently. Play c5 to blast open the center!",
+                    expected: "c5",
+                    wrong: [
+                      { move: "e5", response: "d5", msg: "While e5 is playable, c5 is the sharpest and most aggressive way to punish the slow Sämisch setup." }
+                    ],
                     response: "d5",
                     next: {
-                      prompt: "White pushes d5, closing the center. Now you must switch to a flank attack! Re-route your Knight to e8 to clear the f-pawn.",
-                      expected: "Ne8",
-                      wrong: [
-                        { move: "exd4", response: "Nxd4", msg: "Do not open the center when White has a space advantage! Let them close it, then attack the flanks." }
-                      ],
-                      response: "O-O",
+                      prompt: "White locks the center. Now play e6 to constantly undermine the d5 pawn.",
+                      expected: "e6",
+                      response: "Qd2",
                       next: {
-                        prompt: "White castles. Unleash your attacking plan: push your f-pawn to f5 to break open the kingside!",
-                        expected: "f5",
-                        response: "Ne1",
+                        prompt: "White prepares to castle queenside. Capture on d5!",
+                        expected: "exd5",
+                        response: "cxd5",
                         next: {
-                          prompt: "White prepares to counter on the queenside or defend. Lock the kingside down by pushing f4!",
-                          expected: "f4",
-                          response: "f3",
+                          prompt: "White recaptures. Now expand on the queenside where the position is open. Play a6!",
+                          expected: "a6",
+                          response: "Nge2",
                           next: {
-                            prompt: "White tries to stall your attack. Support your pawn chain and prepare a g5 push. Play g5!",
-                            expected: "g5",
-                            response: "Nd3",
+                            prompt: "White continues development. Bring your Rook to the semi-open e-file.",
+                            expected: "Re8",
+                            response: "Ng3",
                             next: {
-                              prompt: "White brings pieces to the queenside. Continue your pawn storm. Push h5!",
-                              expected: "h5",
-                              response: "Bd2",
+                              prompt: "Develop your Queenside Knight to d7.",
+                              expected: "Nbd7",
+                              response: "Be2",
                               next: {
-                                prompt: "Execute the famous Mar del Plata Rook lift! Bring your Rook to f6, preparing to swing to g6 or h6.",
-                                expected: "Rf6",
-                                response: "c5",
+                                prompt: "White prepares to castle. Jump your Knight into the strong e5 outpost!",
+                                expected: "Ne5",
+                                response: "O-O",
                                 next: {
-                                  prompt: "White strikes on the queenside. Swing your Rook over to g6 to prepare the final assault.",
-                                  expected: "Rg6",
-                                  response: "Rc1",
-                                  next: {
-                                    prompt: "Develop your Queenside Knight to d7 to fortify your structure.",
-                                    expected: "Nd7",
-                                    endpoint: "Excellent! You've achieved the ultimate King's Indian Defense attacking formation. Your pawn storm will completely overwhelm the White King."
-                                  }
+                                  prompt: "White decides to castle kingside instead. Push b5 to launch a massive queenside attack!",
+                                  expected: "b5",
+                                  endpoint: "Fantastic! In the Sämisch, you correctly switched from a kingside attack to a central/queenside explosion. Your Knight on e5 is dominant, and your b5 push creates massive problems for White."
                                 }
                               }
                             }
@@ -412,67 +421,84 @@ export const ACADEMY_MODULES = [
         }
       },
       {
-        id: 'kings_indian_pirc_black',
-        title: "Lesson 3: The Pirc Defense vs e4",
-        description: "How to adapt the King's Indian setup against 1. e4 and counter the aggressive 150 Attack with a Queenside storm.",
+        id: 'kings_indian_attack_white',
+        title: "Lesson 3: The King's Indian Attack (White)",
+        description: "Learn how to use the KID setup as White. Deep middlegame theory resulting in a brilliant piece sacrifice.",
         startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        color: "b",
+        color: "w",
         tree: {
-          prompt: "White plays 1. e4. If you play Nf6 immediately, they will just push e5. Prevent this by playing your d-pawn first (The Pirc Defense).",
-          botFirst: "e4",
-          expected: "d6",
-          wrong: [
-            { move: "Nf6", response: "e5", msg: "Mistake! Against e4, playing Nf6 immediately allows the annoying e5 push. Play d6 first to control that square!" }
-          ],
-          response: "d4",
+          prompt: "Let's build the King's Indian Attack as White! This can be played against almost anything. Start with Nf3.",
+          expected: "Nf3",
+          response: "d5",
           next: {
-            prompt: "White grabs the center. Now it's safe to develop your Knight without fear of being kicked.",
-            expected: "Nf6",
-            response: "Nc3",
+            prompt: "Black grabs the center. Prepare to fianchetto your Bishop on the kingside.",
+            expected: "g3",
+            response: "c5",
             next: {
-              prompt: "Prepare your fianchetto as usual.",
-              expected: "g6",
-              response: "Be3",
+              prompt: "Put your Bishop on the long diagonal.",
+              expected: "Bg2",
+              response: "Nc6",
               next: {
-                prompt: "Watch out! White plays Be3, preparing Qd2 to trade off your dark-squared bishop and attack your King. Delay castling! Start queenside expansion with your a-pawn instead.",
-                expected: "a6",
-                wrong: [
-                  { move: "O-O", response: "Qd2", msg: "Inaccuracy. Castling directly into White's aggressive Be3/Qd2 setup is dangerous. Play a6 to start a counter-attack first!" },
-                  { move: "Bg7", response: "Qd2", msg: "You can play Bg7, but against the 150 Attack (Be3), a6 is the most precise way to start counterplay immediately." }
-                ],
-                response: "Qd2",
+                prompt: "Get your King to safety.",
+                expected: "O-O",
+                response: "e6",
                 next: {
-                  prompt: "White is dead-set on the kingside attack. Ignore them and launch your queenside counter-attack immediately. Play b5!",
-                  expected: "b5",
-                  response: "f3",
+                  prompt: "Play the anti-attack move. Play d3 to control the center.",
+                  expected: "d3",
+                  response: "Nf6",
                   next: {
-                    prompt: "White solidifies the center. Develop your Knight to d7 to support c5 pushes and defend.",
-                    expected: "Nbd7",
-                    response: "O-O-O",
+                    prompt: "Develop your Queenside Knight to d2. This uniquely supports your e-pawn.",
+                    expected: "Nbd2",
+                    response: "Be7",
                     next: {
-                      prompt: "White castles queenside. Develop your light-squared Bishop to b7, pointing directly at White's King!",
-                      expected: "Bb7",
-                      response: "g4",
+                      prompt: "The defensive shell is complete! Now, strike in the center with your e-pawn to gain space.",
+                      expected: "e4",
+                      response: "O-O",
                       next: {
-                        prompt: "White starts throwing pawns at your kingside. Bring your Queenside Knight to b6 to prepare a massive strike on c4!",
-                        expected: "Nb6",
-                        response: "h4",
+                        prompt: "Black castles. To prepare a massive kingside attack, slide your Rook to e1 to support the e5 push.",
+                        expected: "Re1",
+                        response: "b6",
                         next: {
-                          prompt: "White pushes h4. Stop their pawn storm dead in its tracks by playing h5 yourself!",
-                          expected: "h5",
-                          response: "g5",
+                          prompt: "Black expands on the queenside. Advance your e-pawn to kick the Knight and lock the center!",
+                          expected: "e5",
+                          response: "Nd7",
                           next: {
-                            prompt: "White pushes past. Jump your Knight to d7, safely routing it while opening lines for your Bishop.",
-                            expected: "Nfd7",
-                            response: "Nh3",
+                            prompt: "Now the real magic: re-route your f3 Knight to f1! This prepares to swing it to h2 or g5.",
+                            expected: "Nf1",
+                            response: "Bb7",
                             next: {
-                              prompt: "Strike at the center with c5! The queenside storm is in full effect.",
-                              expected: "c5",
-                              response: "dxc5",
+                              prompt: "Start expanding your kingside space. Push h4!",
+                              expected: "h4",
+                              response: "Rc8",
                               next: {
-                                prompt: "White takes. Recapture with the d-pawn to open up lines.",
-                                expected: "dxc5",
-                                endpoint: "Great job! You navigated the dangerous 150 Attack perfectly. It is now a race: White attacks the kingside, but your queenside attack is extremely fast and potent."
+                                prompt: "Develop your dark-squared Bishop to f4 to support the center and eye the kingside.",
+                                expected: "Bf4",
+                                response: "b5",
+                                next: {
+                                  prompt: "Black prepares a b4 push. Swing your Knight to h2, preparing to jump to g4.",
+                                  expected: "N1h2",
+                                  response: "a5",
+                                  next: {
+                                    prompt: "Jump the Knight into the attack! Play Ng4.",
+                                    expected: "Ng4",
+                                    response: "a4",
+                                    next: {
+                                      prompt: "Black pushes a4. Ignore it and bring your Queen up to d2.",
+                                      expected: "Qd2",
+                                      response: "b4",
+                                      next: {
+                                        prompt: "Black's queenside attack is crashing through, but your kingside attack is faster! Sacrifice your Bishop on h6 to obliterate the King's cover!",
+                                        expected: "Bh6",
+                                        response: "gxh6",
+                                        next: {
+                                          prompt: "Black accepts the sacrifice. Capture the h6 pawn with your Queen!",
+                                          expected: "Qxh6",
+                                          endpoint: "Masterful! The classic King's Indian Attack sacrifice. Black's King is completely exposed, and you will follow up with Ng5, forcing checkmate!"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -491,11 +517,11 @@ export const ACADEMY_MODULES = [
   {
     id: 'london_system_module',
     title: "Aggressive London System",
-    description: "Learn GM Igor Smirnov's aggressive approach to the London System, abandoning passive retreats for crushing attacks.",
+    description: "Abandon passive retreats for crushing attacks. Learn GM Igor Smirnov's brutal London System traps.",
     lessons: [
       {
         id: 'london_ne5_main',
-        title: "Lesson 1: The Aggressive Ne5 Anchor",
+        title: "Lesson 1: The Ne5 Anchor",
         description: "Instead of retreating your Bishop passively, learn how to anchor your Knight on e5 and launch a crushing attack.",
         startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 
         color: "w",
@@ -508,15 +534,15 @@ export const ACADEMY_MODULES = [
             expected: "Bf4",
             response: "Nf6",
             next: {
-              prompt: "Black develops. Play e3 to solidify the center and open lines for your light-squared Bishop.",
+              prompt: "Play e3 to solidify the center and open lines for your light-squared Bishop.",
               expected: "e3",
               response: "c5",
               next: {
-                prompt: "Black strikes at the center with c5. Support your d4 pawn by playing c3. This builds the famous London pyramid.",
+                prompt: "Black strikes at the center. Support your d4 pawn by playing c3. This builds the famous London pyramid.",
                 expected: "c3",
                 response: "Nc6",
                 next: {
-                  prompt: "Continue standard development. Bring out your King's Knight.",
+                  prompt: "Bring out your King's Knight.",
                   expected: "Nf3",
                   response: "e6",
                   next: {
@@ -524,7 +550,7 @@ export const ACADEMY_MODULES = [
                     expected: "Nbd2",
                     response: "Bd6",
                     next: {
-                      prompt: "CRITICAL MOMENT! Black offers a trade. Do NOT retreat to g3. Do NOT capture on d6. Instead, anchor your Knight aggressively in the center!",
+                      prompt: "CRITICAL MOMENT! Black offers a trade. Do NOT retreat to g3. Do NOT capture on d6. Instead, anchor your Knight aggressively in the center to e5!",
                       expected: "Ne5",
                       wrong: [
                         { move: "Bg3", response: "O-O", msg: "Inaccuracy. Retreating to g3 is too passive and allows Black easy equality. Jump into the center with Ne5!" },
@@ -532,7 +558,7 @@ export const ACADEMY_MODULES = [
                       ],
                       response: "O-O",
                       next: {
-                        prompt: "Black ignores the Knight and castles. Continue your development by bringing out your light-squared Bishop.",
+                        prompt: "Black ignores the Knight and castles. Continue your development by bringing out your light-squared Bishop to d3.",
                         expected: "Bd3",
                         response: "Qc7",
                         next: {
@@ -562,7 +588,7 @@ export const ACADEMY_MODULES = [
                                     next: {
                                       prompt: "The Queen moves. Capture the Rook on f8!",
                                       expected: "Nxf8",
-                                      endpoint: "Excellent! Your Knight is a monster on e5. You successfully navigated the complications and won an exchange!"
+                                      endpoint: "Excellent! Your Knight was a monster on e5. You successfully navigated the complications and won an exchange!"
                                     }
                                   }
                                 }
@@ -732,7 +758,7 @@ export const ACADEMY_MODULES = [
                                 expected: "Ne2",
                                 response: "Qa5",
                                 next: {
-                                  prompt: "The Queen retreats. Chase it with your dark-squared Bishop to c7!",
+                                  prompt: "The Queen retreats. Chase it out completely with your dark-squared Bishop to c7!",
                                   expected: "Bc7",
                                   endpoint: "Incredible! Because you delayed Nf3, the traditional trap failed entirely. You are up a full piece and completely winning."
                                 }
@@ -807,12 +833,17 @@ export const ACADEMY_MODULES = [
                               expected: "Nc7",
                               response: "Rb8",
                               next: {
-                                prompt: "The Rook runs away. Now capture the Knight on e4 with your f-pawn to win a full piece!",
-                                expected: "fxe4",
+                                prompt: "The Rook runs away. Now play f3! This kicks the Knight on e4, winning a full piece because the Black King cannot defend it.",
+                                expected: "f3",
                                 wrong: [
-                                  { move: "Bxe5", response: "Nxe5", msg: "Don't trade the Bishop! Win the Knight cleanly with fxe4." }
+                                  { move: "fxe4", msg: "You don't have a pawn on f3 to capture on e4! Play f3 to attack the knight." }
                                 ],
-                                endpoint: "Crushing! You have successfully executed the legendary Jobava trap. Black is completely lost!"
+                                response: "Nc5",
+                                next: {
+                                  prompt: "The Knight runs away. Now develop your Kingside Knight to h3, securing your material advantage.",
+                                  expected: "Nh3",
+                                  endpoint: "Crushing! You have successfully executed the legendary Jobava trap. You are up an entire piece and will win the endgame effortlessly!"
+                                }
                               }
                             }
                           }
