@@ -858,37 +858,37 @@ export const ACADEMY_MODULES = [
                       expected: "Qf6",
                       response: "Nb3",
                       next: {
-                        prompt: "Drop straight down the diagonal to c5.",
-                        expected: "Qc5",
+                        prompt: "Slide straight down file f to f3.",
+                        expected: "Qf3",
                         response: "Na1",
                         next: {
-                          prompt: "Move right to d6.",
-                          expected: "Qd6",
+                          prompt: "Slice up the diagonal to c6.",
+                          expected: "Qc6",
                           response: "Nb3",
                           next: {
-                            prompt: "Drop down to e3.",
-                            expected: "Qe3",
+                            prompt: "Drop down file c to c3.",
+                            expected: "Qc3",
                             response: "Na1",
                             next: {
-                              prompt: "Move right to f2.",
-                              expected: "Qf2",
+                              prompt: "Slide horizontally right to f3.",
+                              expected: "Qf3",
                               response: "Nb3",
                               next: {
-                                prompt: "Drop to g2.",
+                                prompt: "Drop down diagonally to g2.",
                                 expected: "Qg2",
                                 response: "Na1",
                                 next: {
-                                  prompt: "Move left to f1.",
-                                  expected: "Qf1",
+                                  prompt: "Fire all the way up the diagonal to b7.",
+                                  expected: "Qb7",
                                   response: "Nb3",
                                   next: {
-                                    prompt: "Move left to e2.",
-                                    expected: "Qe2",
+                                    prompt: "Slide back down the diagonal to e4.",
+                                    expected: "Qe4",
                                     response: "Na1",
                                     next: {
-                                      prompt: "Finish the drill! Land on d3.",
+                                      prompt: "Finish the drill! Slide down-left to d3.",
                                       expected: "Qd3",
-                                      endpoint: "Brilliant! You executed a perfect coordinate sprint."
+                                      endpoint: "Brilliant! You executed a perfect coordinate sprint with zero mistakes."
                                     }
                                   }
                                 }
@@ -963,3 +963,194 @@ export const ACADEMY_MODULES = [
                                   prompt: "Move all the way up to e7.",
                                   expected: "Re7",
                                   response: "Nb3",
+                                  next: {
+                                    prompt: "Slide right to h7.",
+                                    expected: "Rh7",
+                                    response: "Na1",
+                                    next: {
+                                      prompt: "Finish the drill! Drop to h2.",
+                                      expected: "Rh2",
+                                      endpoint: "Fantastic geometry! Your linear board vision is locked in."
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'vision_dark_sniper',
+        title: "Drill 4: The Dark-Square Sniper",
+        description: "Navigate exclusively on the dark squares to master complex diagonal vision.",
+        startFen: "k7/8/8/8/8/8/8/n1B4K w - - 0 1",
+        color: "w",
+        tree: {
+          prompt: "Your Bishop is on c1, a dark square. Move it to d2.",
+          expected: "Bd2",
+          response: "Nb3",
+          next: {
+            prompt: "Slide down to e1.",
+            expected: "Be1",
+            response: "Na1",
+            next: {
+              prompt: "Snipe across the board to h4.",
+              expected: "Bh4",
+              response: "Nb3",
+              next: {
+                prompt: "Slide up to g5.",
+                expected: "Bg5",
+                response: "Na1",
+                next: {
+                  prompt: "Move up to h6.",
+                  expected: "Bh6",
+                  response: "Nb3",
+                  next: {
+                    prompt: "Snipe across to f8.",
+                    expected: "Bf8",
+                    response: "Na1",
+                    next: {
+                      prompt: "Drop down to e7.",
+                      expected: "Be7",
+                      response: "Nb3",
+                      next: {
+                        prompt: "Move up to d8.",
+                        expected: "Bd8",
+                        response: "Na1",
+                        next: {
+                          prompt: "Snipe across to a5.",
+                          expected: "Ba5",
+                          response: "Nb3",
+                          next: {
+                            prompt: "Drop down to b4.",
+                            expected: "Bb4",
+                            response: "Na1",
+                            next: {
+                              prompt: "Drop down again to a3.",
+                              expected: "Ba3",
+                              response: "Nb3",
+                              next: {
+                                prompt: "Snipe back to c1.",
+                                expected: "Bc1",
+                                response: "Na1",
+                                next: {
+                                  prompt: "Move up to d2.",
+                                  expected: "Bd2",
+                                  response: "Nb3",
+                                  next: {
+                                    prompt: "Move up to e3.",
+                                    expected: "Be3",
+                                    response: "Na1",
+                                    next: {
+                                      prompt: "Finish the drill! Drop to f2.",
+                                      expected: "Bf2",
+                                      endpoint: "Outstanding! You successfully identified and navigated the dark-square complex using pure coordinate vision."
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'vision_light_sniper',
+        title: "Drill 5: The Light-Square Sniper",
+        description: "Master the light squares. If you can instantly see diagonal intersections, tactics become easy.",
+        startFen: "k7/8/8/8/8/8/8/n4B1K w - - 0 1",
+        color: "w",
+        tree: {
+          prompt: "Your Bishop is on f1, a light square. Move it up to e2.",
+          expected: "Be2",
+          response: "Nb3",
+          next: {
+            prompt: "Slide up the diagonal to d3.",
+            expected: "Bd3",
+            response: "Na1",
+            next: {
+              prompt: "Move up to c4.",
+              expected: "Bc4",
+              response: "Nb3",
+              next: {
+                prompt: "Move up to b5.",
+                expected: "Bb5",
+                response: "Na1",
+                next: {
+                  prompt: "Move to the edge: a6.",
+                  expected: "Ba6",
+                  response: "Nb3",
+                  next: {
+                    prompt: "Snipe the back rank square c8.",
+                    expected: "Bc8",
+                    response: "Na1",
+                    next: {
+                      prompt: "Drop down to d7.",
+                      expected: "Bd7",
+                      response: "Nb3",
+                      next: {
+                        prompt: "Drop down to e6.",
+                        expected: "Be6",
+                        response: "Na1",
+                        next: {
+                          prompt: "Drop down to f5.",
+                          expected: "Bf5",
+                          response: "Nb3",
+                          next: {
+                            prompt: "Move up-right diagonally to g6.",
+                            expected: "Bg6",
+                            response: "Na1",
+                            next: {
+                              prompt: "Move to the edge: h7.",
+                              expected: "Bh7",
+                              response: "Nb3",
+                              next: {
+                                prompt: "Slide down-left diagonally back to g6.",
+                                expected: "Bg6",
+                                response: "Na1",
+                                next: {
+                                  prompt: "Slide up-left diagonally to f7.",
+                                  expected: "Bf7",
+                                  response: "Nb3",
+                                  next: {
+                                    prompt: "Jump up to e8.",
+                                    expected: "Be8",
+                                    response: "Na1",
+                                    next: {
+                                      prompt: "Finish the drill! Drop down to d7.",
+                                      expected: "Bd7",
+                                      endpoint: "Flawless execution! You now have a complete geometric map of the light squares in your head."
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+];
