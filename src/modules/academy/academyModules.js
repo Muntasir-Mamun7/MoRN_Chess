@@ -112,10 +112,8 @@ export const ACADEMY_MODULES = [
         }
       }
     ]
-  }
-];
-
-{
+  },
+  {
     id: 'kings_indian_module',
     title: "The King's Indian Setup",
     description: "Learn the universal, aggressive King's Indian system for both White and Black, as taught by GothamChess.",
@@ -239,3 +237,4 @@ export const ACADEMY_MODULES = [
       }
     ]
   }
+];
