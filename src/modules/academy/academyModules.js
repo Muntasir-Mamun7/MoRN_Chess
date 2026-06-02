@@ -73,52 +73,72 @@ export const ACADEMY_MODULES = [
         id: 'scholars_mate_passive',
         title: "Lesson 2: Break the Passive Defense",
         description: "Counter White when they play passively with Ne2, leading to a massive center break and an unstoppable attack.",
-        startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4", 
+        startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 
         color: "b",
         tree: {
-          prompt: "We reach the main position again, but this time White plays Ne2 to defend the d4 square. Continue your kingside development by fianchettoing your Bishop.",
-          botFirst: "Ne2",
-          expected: "Bg7",
-          response: "d3",
+          prompt: "We start from the beginning. White plays 1. e4. Control the center.",
+          botFirst: "e4",
+          expected: "e5",
+          response: "Qh5",
           next: {
-            prompt: "White opens the dark-squared bishop's diagonal. Your King is still in the center, so get it to safety.",
-            expected: "O-O",
-            response: "Bg5",
+            prompt: "The Queen attacks early. Defend the e5 pawn with your Knight.",
+            expected: "Nc6",
+            response: "Bc4",
             next: {
-              prompt: "White tries to pin your Knight to your Queen. Immediately ask that Bishop a question with your h-pawn.",
-              expected: "h6",
-              response: "Bh4",
+              prompt: "White threatens mate on f7. Shut it down with your pawn.",
+              expected: "g6",
+              response: "Qf3",
               next: {
-                prompt: "The Bishop retreats, maintaining the pin. Trap it and break the pin entirely by pushing your g-pawn!",
-                expected: "g5",
-                response: "Bg3",
+                prompt: "White renews the threat. Develop your Kingside Knight.",
+                expected: "Nf6",
+                response: "Ne2",
                 next: {
-                  prompt: "Now that the pin is broken and White's pieces are awkward, strike in the center with full force!",
-                  expected: "d5",
-                  wrong: [
-                    { move: "d6", response: "Nbc3", msg: "Too slow! When your opponent's pieces are misplaced on the flank, you must strike the center with d5!" }
-                  ],
-                  response: "exd5",
+                  prompt: "Instead of attacking, White plays passively with Ne2 to defend the d4 square. Continue your kingside development by fianchettoing your Bishop.",
+                  expected: "Bg7",
+                  response: "d3",
                   next: {
-                    prompt: "White captures. Again, do not recapture blindly! Use the in-between move to attack the Queen.",
-                    expected: "Bg4",
-                    response: "Qe3",
+                    prompt: "White opens the dark-squared bishop's diagonal. Your King is still in the center, so get it to safety.",
+                    expected: "O-O",
+                    response: "Bg5",
                     next: {
-                      prompt: "The Queen moves to e3. Now, jump your central Knight to d4! You are threatening a massive fork on c2.",
-                      expected: "Nd4",
-                      response: "Nxd4",
+                      prompt: "White tries to pin your Knight to your Queen. Immediately ask that Bishop a question with your h-pawn.",
+                      expected: "h6",
+                      response: "Bh4",
                       next: {
-                        prompt: "White trades Knights. Recapture with your e-pawn, kicking the Queen again!",
-                        expected: "exd4",
-                        response: "Qxd4",
+                        prompt: "The Bishop retreats, maintaining the pin. Trap it and break the pin entirely by pushing your g-pawn!",
+                        expected: "g5",
+                        response: "Bg3",
                         next: {
-                          prompt: "White grabs the pawn, but their King is stuck in the center. Skewer the King and Queen with your Rook!",
-                          expected: "Re8+",
-                          response: "Kd2",
+                          prompt: "Now that the pin is broken and White's pieces are awkward, strike in the center with full force!",
+                          expected: "d5",
+                          wrong: [
+                            { move: "d6", response: "Nbc3", msg: "Too slow! When your opponent's pieces are misplaced on the flank, you must strike the center with d5!" }
+                          ],
+                          response: "exd5",
                           next: {
-                            prompt: "The King steps to d2. Keep the initiative flowing! Develop your last minor piece and attack the Queen again with Ne4.",
-                            expected: "Ne4+",
-                            endpoint: "Phenomenal! White's King is caught in a crossfire, and their Queen is completely misplaced. You have total domination and will win material shortly."
+                            prompt: "White captures. Again, do not recapture blindly! Use the in-between move to develop your Bishop and attack the Queen.",
+                            expected: "Bg4",
+                            response: "Qe3",
+                            next: {
+                              prompt: "The Queen moves to e3. Now, jump your central Knight to d4! You are threatening a massive fork on c2.",
+                              expected: "Nd4",
+                              response: "Nxd4",
+                              next: {
+                                prompt: "White trades Knights. Recapture with your e-pawn, kicking the Queen again!",
+                                expected: "exd4",
+                                response: "Qxd4",
+                                next: {
+                                  prompt: "White grabs the pawn, but their King is stuck in the center. Skewer the King and Queen with your Rook!",
+                                  expected: "Re8+",
+                                  response: "Kd2",
+                                  next: {
+                                    prompt: "The King steps to d2. Keep the initiative flowing! Develop your last minor piece and attack the Queen again with Ne4.",
+                                    expected: "Ne4+",
+                                    endpoint: "Phenomenal! White's King is caught in a crossfire, and their Queen is completely misplaced. You have total domination and will win material shortly."
+                                  }
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -544,7 +564,17 @@ export const ACADEMY_MODULES = [
                                 next: {
                                   prompt: "Black locks the center. It's time to rip it open again. Push g4!",
                                   expected: "g4",
-                                  endpoint: "Brilliant! From here, Black is suffocating. You are dismantling their Kingside step by step."
+                                  response: "Qe7",
+                                  next: {
+                                    prompt: "Black brings the Queen over to defend. Break the pawn structure! Play gxf5.",
+                                    expected: "gxf5",
+                                    response: "exf5",
+                                    next: {
+                                      prompt: "Black recaptures. Now jump your other Knight to f3! It is headed for g5.",
+                                      expected: "Nf3",
+                                      endpoint: "Brilliant! From here, Black is suffocating. The Knight jumps to g5, and your attack down the g and h files is completely unstoppable."
+                                    }
+                                  }
                                 }
                               }
                             }
@@ -560,8 +590,68 @@ export const ACADEMY_MODULES = [
         }
       },
       {
+        id: 'london_delayed_nf3',
+        title: "Lesson 3: The Delayed Nf3 Trap",
+        description: "Delaying your Nf3 development allows you to punish early Queen attacks on b6.",
+        startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 
+        color: "w",
+        tree: {
+          prompt: "Play 1. d4.",
+          expected: "d4",
+          response: "d5",
+          next: {
+            prompt: "Develop your Bishop to f4.",
+            expected: "Bf4",
+            response: "Nf6",
+            next: {
+              prompt: "Play e3.",
+              expected: "e3",
+              response: "c5",
+              next: {
+                prompt: "Play c3.",
+                expected: "c3",
+                response: "Nc6",
+                next: {
+                  prompt: "Here is the trick! Do NOT play Nf3 yet. Play your Queenside Knight to d2 first.",
+                  expected: "Nd2",
+                  response: "Qb6",
+                  next: {
+                    prompt: "Black tries the tricky Qb6, attacking b2. Defend it and counter-attack with Qb3.",
+                    expected: "Qb3",
+                    response: "c4",
+                    next: {
+                      prompt: "Black pushes c4, attacking your Queen. Slide it back safely to c2.",
+                      expected: "Qc2",
+                      response: "Bf5",
+                      next: {
+                        prompt: "Black plays Bf5, a famous theoretical sacrifice. If you had a Knight on f3, capturing would trap your Rook. But you don't! Call their bluff and capture the Bishop!",
+                        expected: "Qxf5",
+                        wrong: [
+                          { move: "Qd1", response: "Nf6", msg: "Too passive! The whole point of delaying Nf3 is so you can safely grab this Bishop!" }
+                        ],
+                        response: "Qxb2",
+                        next: {
+                          prompt: "Black grabs the pawn and attacks your Rook on a1. Simply slide it over to b1. Your Rook is safe!",
+                          expected: "Rb1",
+                          response: "Qxa2",
+                          next: {
+                            prompt: "Black grabs the a-pawn, hoping to escape. Trap the Queen by taking on b7!",
+                            expected: "Rxb7",
+                            endpoint: "Incredible! Because you delayed Nf3, the traditional trap failed entirely. You are up a full piece and completely winning."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
         id: 'london_jobava_trap',
-        title: "Lesson 3: The Jobava Trap vs. King's Indian",
+        title: "Lesson 4: The Jobava Trap vs. King's Indian",
         description: "When Black plays the King's Indian Defense, switch to the Jobava London to set a deadly trap.",
         startFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 
         color: "w",
@@ -572,38 +662,56 @@ export const ACADEMY_MODULES = [
           next: {
             prompt: "Black plays Nf6, indicating a King's Indian. Play the London Bishop to f4.",
             expected: "Bf4",
-            response: "d5",
+            response: "g6",
             next: {
-              prompt: "Black plays d5. Play e3.",
-              expected: "e3",
-              response: "c5",
+              prompt: "Black prepares the fianchetto. Because the standard London is passive here, switch to the Jobava London! Develop your Queenside Knight to c3 aggressively.",
+              expected: "Nc3",
+              response: "d5",
               next: {
-                prompt: "Black strikes with c5. Because they delayed their fianchetto, switch to the Jobava London! Develop your Queenside Knight to c3 aggressively.",
-                expected: "Nc3",
-                response: "Nc6",
+                prompt: "Black plays d5 to stop your e4 push. Play e3 to solidify.",
+                expected: "e3",
+                response: "c5",
                 next: {
-                  prompt: "Black plays Nc6. Jump your Knight forward to b5 to threaten a devastating fork on c7!",
-                  expected: "Nb5",
-                  response: "e5",
+                  prompt: "Black strikes with c5. Since they delayed their bishop, push your d-pawn to grab space! Play dxc5.",
+                  expected: "dxc5",
+                  wrong: [
+                    { move: "c3", response: "Bg7", msg: "Inaccuracy. c3 is too passive in the Jobava setup. Capture on c5 or play something active!" }
+                  ],
+                  response: "Bg7",
                   next: {
-                    prompt: "Black plays e5 to block the Bishop. Capture the pawn with your d-pawn.",
-                    expected: "dxe5",
-                    response: "Ne4",
+                    prompt: "Black develops. Now push your e-pawn to e4, opening lines and grabbing center space.",
+                    expected: "e4",
+                    response: "O-O",
                     next: {
-                      prompt: "Black's Knight jumps to e4. This is a massive blunder! Trade Queens to remove their defense of the c7 square.",
-                      expected: "Qxd5",
-                      wrong: [
-                        { move: "Nf3", response: "Qa5+", msg: "Too slow! Black plays Qa5+ and you lose the initiative. Capture the Queen on d5!" }
-                      ],
-                      response: "Qxd5",
+                      prompt: "Black castles. Here is where many club players blunder. Prepare the trap by playing the Queen up to d2.",
+                      expected: "Qd2",
+                      response: "Nc6",
                       next: {
-                        prompt: "Now execute the brutal royal fork on c7 with your Knight!",
-                        expected: "Nc7+",
-                        response: "Kd8",
+                        prompt: "Black plays Nc6, a huge blunder in this specific line! Spring the trap—jump your Knight forward to b5 to threaten a devastating fork on c7!",
+                        expected: "Nb5",
+                        response: "e5",
                         next: {
-                          prompt: "The King moves. Capture the Queen!",
-                          expected: "Nxd5",
-                          endpoint: "Crushing! You have successfully executed the legendary Jobava trap. Black is completely lost!"
+                          prompt: "Black plays e5 to block the Bishop. Capture the pawn with your d-pawn.",
+                          expected: "dxe5",
+                          response: "Ne4",
+                          next: {
+                            prompt: "Black's Knight jumps to e4. This is a massive blunder! Trade Queens to remove their defense of the c7 square.",
+                            expected: "Qxd8",
+                            wrong: [
+                              { move: "Nf3", response: "Qa5+", msg: "Too slow! Black plays Qa5+ and you lose the initiative. Capture the Queen on d8!" }
+                            ],
+                            response: "Rxd8",
+                            next: {
+                              prompt: "Now execute the brutal royal fork on c7 with your Knight!",
+                              expected: "Nc7",
+                              response: "Rb8",
+                              next: {
+                                prompt: "The Rook runs away. Simply grab the Knight on e4 with your Bishop!",
+                                expected: "Bxe5",
+                                endpoint: "Crushing! You have successfully executed the legendary Jobava trap. Black is completely lost!"
+                              }
+                            }
+                          }
                         }
                       }
                     }
