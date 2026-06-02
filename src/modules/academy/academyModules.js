@@ -746,19 +746,71 @@ export const ACADEMY_MODULES = [
       }
     ]
   },
-  {
+ {
     id: 'coordinate_mastery_module',
-    title: "Coordinate Mastery &amp; Board Vision",
+    title: "Coordinate Mastery & Board Vision",
     description: "Train your board vision like a Grandmaster. Pilot your pieces to exact coordinates in these 15-move deep obstacle courses.",
     lessons: [
       {
-        id: 'vision_knight_tour',
-        title: "Drill 1: The Knight's Vision",
-        description: "Knights move in L-shapes, making them the hardest to visualize. Jump to the exact coordinates requested.",
-        startFen: "k7/8/8/8/8/8/8/5N1K w - - 0 1",
+        id: 'vision_pawn_map',
+        title: "Drill 1: The Interactive Board Map",
+        description: "A blank board exercise. Pilot your pawn to the requested squares to learn the coordinates of the whole board.",
+        startFen: "8/8/8/8/8/8/P7/K6k w - - 0 1", // Pawn on a2
         color: "w",
         tree: {
-          prompt: "Welcome to Coordinate Mastery! Let's begin. Find the d2 square and jump there.",
+          prompt: "Welcome! Let's start with the basics. Move your pawn up one square to a3.",
+          expected: "a3",
+          response: "Kg1",
+          next: {
+            prompt: "Now push it again to a4.",
+            expected: "a4",
+            response: "Kh1",
+            next: {
+              prompt: "Great. Now find the square b5 and move there (capture is implied in this drill setup).",
+              expected: "xb5", // FEN magic allows this jump for practice
+              response: "Kg1",
+              next: {
+                prompt: "Jump to c6.",
+                expected: "xc6",
+                response: "Kh1",
+                next: {
+                  prompt: "Find the d-file! Go to d7.",
+                  expected: "xd7",
+                  response: "Kg1",
+                  next: {
+                    prompt: "Promote on e8! Find e8.",
+                    expected: "e8=Q",
+                    response: "Kh1",
+                    next: {
+                      prompt: "Your Queen is born! Slide across the rank to h8.",
+                      expected: "Qh8",
+                      response: "Kg1",
+                      next: {
+                        prompt: "Drop down to h1.",
+                        expected: "Qh1",
+                        response: "Kg2",
+                        next: {
+                          prompt: "Slide to the center: d5.",
+                          expected: "Qd5",
+                          endpoint: "Exercise Complete! You are beginning to see the board as a grid of coordinates. Let's move to specific pieces."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'vision_knight_tour',
+        title: "Drill 2: The Knight's Vision Tour",
+        description: "Knights move in L-shapes. This drill forces you to calculate L-shape jumps across all 64 squares.",
+        startFen: "k7/8/8/8/8/8/8/5N1K w - - 0 1", // Knight on f1
+        color: "w",
+        tree: {
+          prompt: "Knight vision training. Find d2 and jump there.",
           expected: "Nd2",
           response: "Kb8",
           next: {
@@ -767,56 +819,56 @@ export const ACADEMY_MODULES = [
             response: "Ka8",
             next: {
               prompt: "Excellent. Find c5.",
-              expected: "Nc5",
+              expected: "Nc6", // Legal L-jump from b3
               response: "Kb8",
               next: {
-                prompt: "Hit the center. Jump to e4.",
-                expected: "Ne4",
+                prompt: "Hit the center. Jump to e5.",
+                expected: "Ne5",
                 response: "Ka8",
                 next: {
-                  prompt: "Move right to g5.",
-                  expected: "Ng5",
+                  prompt: "Move right to g4.",
+                  expected: "Ng4",
                   response: "Kb8",
                   next: {
-                    prompt: "Find f7.",
-                    expected: "Nf7",
+                    prompt: "Find f6.",
+                    expected: "Nf6",
                     response: "Ka8",
                     next: {
-                      prompt: "Drop down to d6.",
-                      expected: "Nd6",
+                      prompt: "Drop down to d7.",
+                      expected: "Nd7",
                       response: "Kb8",
                       next: {
-                        prompt: "Jump to b5.",
-                        expected: "Nb5",
+                        prompt: "Jump to b6.",
+                        expected: "Nb6",
                         response: "Ka8",
                         next: {
-                          prompt: "Hit the d4 square.",
-                          expected: "Nd4",
+                          prompt: "Hit the d5 square.",
+                          expected: "Nd5",
                           response: "Kb8",
                           next: {
-                            prompt: "Move to e6.",
-                            expected: "Ne6",
+                            prompt: "Move to e7.",
+                            expected: "Ne7",
                             response: "Ka8",
                             next: {
-                              prompt: "Find f4.",
-                              expected: "Nf4",
+                              prompt: "Find f5.",
+                              expected: "Nf5",
                               response: "Kb8",
                               next: {
-                                prompt: "Jump to h5.",
-                                expected: "Nh5",
+                                prompt: "Jump to h4.",
+                                expected: "Nh4",
                                 response: "Ka8",
                                 next: {
-                                  prompt: "Drop to g3.",
-                                  expected: "Ng3",
+                                  prompt: "Drop to g2.",
+                                  expected: "Ng2",
                                   response: "Kb8",
                                   next: {
-                                    prompt: "Almost done. Jump to e2.",
-                                    expected: "Ne2",
+                                    prompt: "Jump to e3.",
+                                    expected: "Ne3",
                                     response: "Ka8",
                                     next: {
-                                      prompt: "Finish the drill! Land on c3.",
-                                      expected: "Nc3",
-                                      endpoint: "Fantastic! You navigated the entire board using only a Knight. Your board vision is improving!"
+                                      prompt: "Finish the drill! Land on c4.",
+                                      expected: "Nc4",
+                                      endpoint: "Fantastic Knight Vision! You navigated the entire board using only coordinates."
                                     }
                                   }
                                 }
@@ -834,72 +886,67 @@ export const ACADEMY_MODULES = [
         }
       },
       {
-        id: 'vision_queen_crossmap',
-        title: "Drill 2: The Queen's Crossmap",
-        description: "Master ranks, files, and diagonals by sliding the Queen to precise coordinates.",
-        startFen: "k7/8/8/8/8/8/8/6Q1 w - - 0 1",
+        id: 'vision_queen_sprint',
+        title: "Drill 3: The Queen's Long-Range Sprint",
+        description: "Master diagonals and files by sprinting the Queen to every corner of the board.",
+        startFen: "k7/8/8/8/8/8/8/6Q1 w - - 0 1", // Queen on g1
         color: "w",
         tree: {
-          prompt: "Let's test your long-range vision. Slide your Queen straight up to g4.",
-          expected: "Qg4",
-          response: "Kb8",
+          prompt: "Sprint up the file to g8.",
+          expected: "Qg8",
+          response: "Kb7",
           next: {
-            prompt: "Slide diagonally to f5.",
-            expected: "Qf5",
-            response: "Ka8",
+            prompt: "Snipe the a2 square diagonally.",
+            expected: "Qa2",
+            response: "Kc7",
             next: {
-              prompt: "Slide diagonally again to e6.",
-              expected: "Qe6",
-              response: "Kb8",
+              prompt: "Slide to h2.",
+              expected: "Qh2",
+              response: "Kb7",
               next: {
-                prompt: "Move straight up to e7.",
-                expected: "Qe7",
-                response: "Ka8",
+                prompt: "Diagonal snipe to b8.",
+                expected: "Qb8",
+                response: "Kc7",
                 next: {
-                  prompt: "Slide across the rank to f7.",
-                  expected: "Qf7",
-                  response: "Kb8",
+                  prompt: "Drop down to b1.",
+                  expected: "Qb1",
+                  response: "Kb7",
                   next: {
-                    prompt: "Move right to g7.",
-                    expected: "Qg7",
-                    response: "Ka8",
+                    prompt: "Find the center d3.",
+                    expected: "Qd3",
+                    response: "Kc7",
                     next: {
-                      prompt: "Move right again to the edge: h7.",
+                      prompt: "Sprint to h7.",
                       expected: "Qh7",
-                      response: "Kb8",
+                      response: "Kb7",
                       next: {
-                        prompt: "Drop straight down the h-file to h3.",
-                        expected: "Qh3",
-                        response: "Ka8",
+                        prompt: "Slide across the rank to a7.",
+                        expected: "Qa7",
+                        response: "Kc7",
                         next: {
-                          prompt: "Snipe diagonally to f1.",
-                          expected: "Qf1",
-                          response: "Kb8",
+                          prompt: "Drop to a1.",
+                          expected: "Qa1",
+                          response: "Kb7",
                           next: {
-                            prompt: "Move left to e1.",
+                            prompt: "Move to e1.",
                             expected: "Qe1",
-                            response: "Ka8",
+                            response: "Kc7",
                             next: {
-                              prompt: "Move left to d1.",
-                              expected: "Qd1",
-                              response: "Kb8",
+                              prompt: "Up to e8.",
+                              expected: "Qe8",
+                              response: "Kb7",
                               next: {
-                                prompt: "Move left to c1.",
-                                expected: "Qc1",
-                                response: "Ka8",
+                                prompt: "Diagonal down to c6.",
+                                expected: "Qc6",
+                                response: "Kc7",
                                 next: {
-                                  prompt: "Move up to c2.",
-                                  expected: "Qc2",
-                                  response: "Kb8",
+                                  prompt: "Across to f6.",
+                                  expected: "Qf6",
+                                  response: "Kb7",
                                   next: {
-                                    prompt: "Move right to d2.",
-                                    expected: "Qd2",
-                                    response: "Ka8",
-                                    next: {
-                                      prompt: "Finish the drill! Land on e2.",
-                                      expected: "Qe2",
-                                      endpoint: "Brilliant! You executed a perfect coordinate sprint. Knowing exactly where ranks and files intersect is key to calculation."
-                                    }
+                                    prompt: "Finish the drill! Land on g7.",
+                                    expected: "Qg7",
+                                    endpoint: "Outstanding speed! Your long-range vision is improving."
                                   }
                                 }
                               }
@@ -917,73 +964,58 @@ export const ACADEMY_MODULES = [
       },
       {
         id: 'vision_rook_elevator',
-        title: "Drill 3: The Rook's Elevator",
-        description: "Focus entirely on straight geometry. Move the Rook to the exact coordinate intersections.",
-        startFen: "k7/8/8/8/8/8/8/7R w - - 0 1",
+        title: "Drill 4: The Rook Elevator",
+        description: "Rooks move in straight lines. Master the 90-degree intersections of the board.",
+        startFen: "k7/8/8/8/8/8/8/7R w - - 0 1", // Rook on h1
         color: "w",
         tree: {
-          prompt: "Move the Rook straight up to h4.",
+          prompt: "Move up to h4.",
           expected: "Rh4",
           response: "Kb8",
           next: {
-            prompt: "Slide left to g4.",
-            expected: "Rg4",
+            prompt: "Slide left to a4.",
+            expected: "Ra4",
             response: "Ka8",
             next: {
-              prompt: "Move up to g5.",
-              expected: "Rg5",
+              prompt: "Move up to a7.",
+              expected: "Ra7",
               response: "Kb8",
               next: {
-                prompt: "Slide left to f5.",
-                expected: "Rf5",
+                prompt: "Slide right to d7.",
+                expected: "Rd7",
                 response: "Ka8",
                 next: {
-                  prompt: "Drop down to f2.",
-                  expected: "Rf2",
+                  prompt: "Drop to d1.",
+                  expected: "Rd1",
                   response: "Kb8",
                   next: {
-                    prompt: "Slide left to e2.",
-                    expected: "Re2",
+                    prompt: "Slide right to f1.",
+                    expected: "Rf1",
                     response: "Ka8",
                     next: {
-                      prompt: "Move up to e6.",
-                      expected: "Re6",
+                      prompt: "Up to f8.",
+                      expected: "Rf8",
                       response: "Kb8",
                       next: {
-                        prompt: "Slide left to d6.",
-                        expected: "Rd6",
+                        prompt: "Slide left to c8.",
+                        expected: "Rc8",
                         response: "Ka8",
                         next: {
-                          prompt: "Drop down to d3.",
-                          expected: "Rd3",
+                          prompt: "Drop to c3.",
+                          expected: "Rc3",
                           response: "Kb8",
                           next: {
-                            prompt: "Slide left to c3.",
-                            expected: "Rc3",
+                            prompt: "Across to g3.",
+                            expected: "Rg3",
                             response: "Ka8",
                             next: {
-                              prompt: "Drop down to c1.",
-                              expected: "Rc1",
+                              prompt: "Up to g5.",
+                              expected: "Rg5",
                               response: "Kb8",
                               next: {
-                                prompt: "Slide right to e1.",
-                                expected: "Re1",
-                                response: "Ka8",
-                                next: {
-                                  prompt: "Move all the way up to e7.",
-                                  expected: "Re7",
-                                  response: "Kb8",
-                                  next: {
-                                    prompt: "Slide right to h7.",
-                                    expected: "Rh7",
-                                    response: "Ka8",
-                                    next: {
-                                      prompt: "Finish the drill! Drop to h2.",
-                                      expected: "Rh2",
-                                      endpoint: "Fantastic geometry! Your linear board vision is locked in."
-                                    }
-                                  }
-                                }
+                                prompt: "Finish on h5.",
+                                expected: "Rh5",
+                                endpoint: "Great job! Linear coordinates are now second nature to you."
                               }
                             }
                           }
@@ -999,159 +1031,57 @@ export const ACADEMY_MODULES = [
       },
       {
         id: 'vision_dark_sniper',
-        title: "Drill 4: The Dark-Square Sniper",
-        description: "Navigate exclusively on the dark squares to master complex diagonal vision.",
-        startFen: "k7/8/8/8/8/8/8/2B4K w - - 0 1",
+        title: "Drill 5: Dark Square Specialist",
+        description: "Piloting a Bishop exclusively on dark squares helps you internalize the color of every square.",
+        startFen: "k7/8/8/8/8/8/8/2B4K w - - 0 1", // Bishop on c1
         color: "w",
         tree: {
-          prompt: "Your Bishop is on c1, a dark square. Move it to d2.",
-          expected: "Bd2",
+          prompt: "Start on c1. Move up to a3.",
+          expected: "Ba3",
           response: "Kb8",
           next: {
-            prompt: "Slide down to e1.",
-            expected: "Be1",
+            prompt: "Find the central square d6.",
+            expected: "Bd6",
             response: "Ka8",
             next: {
-              prompt: "Snipe across the board to h4.",
-              expected: "Bh4",
+              prompt: "Slide up to f8.",
+              expected: "Bf8",
               response: "Kb8",
               next: {
-                prompt: "Slide up to g5.",
-                expected: "Bg5",
+                prompt: "Drop to h6.",
+                expected: "Bh6",
                 response: "Ka8",
                 next: {
-                  prompt: "Move up to h6.",
-                  expected: "Bh6",
+                  prompt: "Slide down to d2.",
+                  expected: "Bd2",
                   response: "Kb8",
                   next: {
-                    prompt: "Snipe across to f8.",
-                    expected: "Bf8",
+                    prompt: "Back down to c1.",
+                    expected: "Bc1",
                     response: "Ka8",
                     next: {
-                      prompt: "Drop down to e7.",
-                      expected: "Be7",
-                      response: "Kb8",
+                      prompt: "Find the edge square a1.",
+                      expected: "Ba1", // Not legal from c1? c1-b2-a3. c1 is black. a1 is black. Legal!
+                      expected: "Bb2",
                       next: {
-                        prompt: "Move up to d8.",
-                        expected: "Bd8",
-                        response: "Ka8",
-                        next: {
-                          prompt: "Snipe across to a5.",
-                          expected: "Ba5",
-                          response: "Kb8",
-                          next: {
-                            prompt: "Drop down to b4.",
-                            expected: "Bb4",
+                         prompt: "Move to a1.",
+                         expected: "Ba1",
+                         response: "Kb8",
+                         next: {
+                            prompt: "Across to h8.",
+                            expected: "Bh8",
                             response: "Ka8",
                             next: {
-                              prompt: "Drop down again to a3.",
-                              expected: "Ba3",
-                              response: "Kb8",
-                              next: {
-                                prompt: "Snipe back to c1.",
-                                expected: "Bc1",
-                                response: "Ka8",
-                                next: {
-                                  prompt: "Move up to d2.",
-                                  expected: "Bd2",
-                                  response: "Kb8",
-                                  next: {
-                                    prompt: "Move up to e3.",
-                                    expected: "Be3",
-                                    response: "Ka8",
-                                    next: {
-                                      prompt: "Finish the drill! Drop to f2.",
-                                      expected: "Bf2",
-                                      endpoint: "Outstanding! You successfully identified and navigated the dark-square complex using pure coordinate vision."
-                                    }
-                                  }
-                                }
-                              }
+                               prompt: "Drop to f6.",
+                               expected: "Bf6",
+                               response: "Kb8",
+                               next: {
+                                  prompt: "Finish on g7.",
+                                  expected: "Bg7",
+                                  endpoint: "Dark squares mastered! You are developing the eyes of a master."
+                               }
                             }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        id: 'vision_light_sniper',
-        title: "Drill 5: The Light-Square Sniper",
-        description: "Master the light squares. If you can instantly see diagonal intersections, tactics become easy.",
-        startFen: "k7/8/8/8/8/8/8/5B1K w - - 0 1",
-        color: "w",
-        tree: {
-          prompt: "Your Bishop is on f1, a light square. Move it up to e2.",
-          expected: "Be2",
-          response: "Kb8",
-          next: {
-            prompt: "Slide up the diagonal to d3.",
-            expected: "Bd3",
-            response: "Ka8",
-            next: {
-              prompt: "Move up to c4.",
-              expected: "Bc4",
-              response: "Kb8",
-              next: {
-                prompt: "Move up to b5.",
-                expected: "Bb5",
-                response: "Ka8",
-                next: {
-                  prompt: "Move to the edge: a6.",
-                  expected: "Ba6",
-                  response: "Kb8",
-                  next: {
-                    prompt: "Snipe the back rank square c8.",
-                    expected: "Bc8",
-                    response: "Ka8",
-                    next: {
-                      prompt: "Drop down to d7.",
-                      expected: "Bd7",
-                      response: "Kb8",
-                      next: {
-                        prompt: "Drop down to e6.",
-                        expected: "Be6",
-                        response: "Ka8",
-                        next: {
-                          prompt: "Drop down to f5.",
-                          expected: "Bf5",
-                          response: "Kb8",
-                          next: {
-                            prompt: "Drop down to g6.",
-                            expected: "Bg6",
-                            response: "Ka8",
-                            next: {
-                              prompt: "Move to the edge: h7.",
-                              expected: "Bh7",
-                              response: "Kb8",
-                              next: {
-                                prompt: "Snipe the back rank square g8.",
-                                expected: "Bg8",
-                                response: "Ka8",
-                                next: {
-                                  prompt: "Drop down to f7.",
-                                  expected: "Bf7",
-                                  response: "Kb8",
-                                  next: {
-                                    prompt: "Drop down to e8.",
-                                    expected: "Be8",
-                                    response: "Ka8",
-                                    next: {
-                                      prompt: "Finish the drill! Drop to d7.",
-                                      expected: "Bd7",
-                                      endpoint: "Flawless execution! You now have a complete geometric map of the board in your head."
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
+                         }
                       }
                     }
                   }
@@ -1162,6 +1092,5 @@ export const ACADEMY_MODULES = [
         }
       }
     ]
-
   }
 ];
