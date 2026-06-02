@@ -745,5 +745,176 @@ export const ACADEMY_MODULES = [
         }
       }
     ]
+  },
+  {
+    id: 'coordinate_mastery_module',
+    title: "Coordinate Mastery &amp; Board Vision",
+    description: "Train your board vision like a Grandmaster. Learn to instantly recognize squares without looking at the coordinates through fun, interactive obstacle courses.",
+    lessons: [
+      {
+        id: 'vision_knight_tour',
+        title: "Lesson 1: The Knight's Vision Tour",
+        description: "Knights move in L-shapes, making them the hardest pieces to visualize. Jump to the exact coordinates requested to complete the tour.",
+        startFen: "7k/8/8/8/8/8/8/KN6 w - - 0 1",
+        color: "w",
+        tree: {
+          prompt: "Welcome to Coordinate Mastery! Let's begin the Knight Tour. Instantly find the c3 square and jump there.",
+          expected: "Nc3",
+          response: "Kg8",
+          next: {
+            prompt: "Good! Now find the central dark square: d5.",
+            expected: "Nd5",
+            response: "Kh8",
+            next: {
+              prompt: "Excellent. Jump up the board to e7.",
+              expected: "Ne7",
+              response: "Kg8",
+              next: {
+                prompt: "Hit the back rank! Go to c8.",
+                expected: "Nc8",
+                response: "Kh8",
+                next: {
+                  prompt: "Drop back down the board to b6.",
+                  expected: "Nb6",
+                  response: "Kg8",
+                  next: {
+                    prompt: "Find the edge of the board. Jump to a4.",
+                    expected: "Na4",
+                    response: "Kh8",
+                    next: {
+                      prompt: "Move to c5.",
+                      expected: "Nc5",
+                      response: "Kg8",
+                      next: {
+                        prompt: "Jump into the absolute center of the board: e4.",
+                        expected: "Ne4",
+                        response: "Kh8",
+                        next: {
+                          prompt: "Move back up to d6.",
+                          expected: "Nd6",
+                          response: "Kg8",
+                          next: {
+                            prompt: "Great. Now jump to f5.",
+                            expected: "Nf5",
+                            response: "Kh8",
+                            next: {
+                              prompt: "Almost there! Jump to g7.",
+                              expected: "Ng7",
+                              response: "Kg8",
+                              next: {
+                                prompt: "Finish the drill! Land on e6.",
+                                expected: "Ne6",
+                                endpoint: "Fantastic! You navigated the entire board using only a Knight and your coordinate knowledge. Your board vision is improving!"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'vision_queen_staircase',
+        title: "Lesson 2: The Queen's Staircase",
+        description: "Master ranks, files, and long diagonals by chasing the enemy King down a coordinate staircase.",
+        startFen: "7k/8/8/8/8/8/8/KQ6 w - - 0 1",
+        color: "w",
+        tree: {
+          prompt: "Let's test your long-range vision. Slide your Queen all the way across the 1st rank to deliver a check on h1!",
+          expected: "Qh1+",
+          response: "Kg8",
+          next: {
+            prompt: "The King ran to g8. Snipe all the way across the long light-squared diagonal to a8!",
+            expected: "Qa8+",
+            response: "Kh7",
+            next: {
+              prompt: "The King steps down. Drop your Queen exactly to b7 to check him again.",
+              expected: "Qb7+",
+              response: "Kh6",
+              next: {
+                prompt: "Slide diagonally down one square to c6.",
+                expected: "Qc6+",
+                response: "Kh5",
+                next: {
+                  prompt: "Keep the staircase going! Move to the central square d5.",
+                  expected: "Qd5+",
+                  response: "Kh4",
+                  next: {
+                    prompt: "Drop down diagonally to e4.",
+                    expected: "Qe4+",
+                    response: "Kh3",
+                    next: {
+                      prompt: "Find the f3 square and check him again.",
+                      expected: "Qf3+",
+                      response: "Kh2",
+                      next: {
+                        prompt: "Down to f2!",
+                        expected: "Qf2+",
+                        response: "Kh1",
+                        next: {
+                          prompt: "The King is trapped in the corner! Finish the drill by landing on f1.",
+                          expected: "Qf1+",
+                          endpoint: "Brilliant! You executed a perfect coordinate staircase. Knowing exactly where ranks and diagonals intersect is the key to Grandmaster calculation."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        id: 'vision_bishop_sniper',
+        title: "Lesson 3: The Dark-Square Sniper",
+        description: "Lichess and top coaches emphasize knowing square colors. This drill forces you to navigate exclusively on dark squares.",
+        startFen: "7k/8/8/8/8/8/8/K1B5 w - - 0 1",
+        color: "w",
+        tree: {
+          prompt: "Your Bishop is on c1, a dark square. Move it up the diagonal to f4.",
+          expected: "Bf4",
+          wrong: [
+            { move: "Bg5", msg: "g5 is a dark square, but that's not the coordinate I asked for! Find f4." }
+          ],
+          response: "Kg8",
+          next: {
+            prompt: "Slide up the same diagonal to c7.",
+            expected: "Bc7",
+            response: "Kh8",
+            next: {
+              prompt: "Drop down to the edge of the board: a5.",
+              expected: "Ba5",
+              response: "Kg8",
+              next: {
+                prompt: "Return all the way to the first rank. Go to e1.",
+                expected: "Be1",
+                response: "Kh8",
+                next: {
+                  prompt: "Snipe across the board to the h-file. Land on h4.",
+                  expected: "Bh4",
+                  response: "Kg8",
+                  next: {
+                    prompt: "Slide up the diagonal to d8.",
+                    expected: "Bd8",
+                    response: "Kh8",
+                    next: {
+                      prompt: "Finish the drill! Deliver a beautiful check by finding the f6 square.",
+                      expected: "Bf6+",
+                      endpoint: "Outstanding! You successfully identified and navigated the dark-square complex using pure coordinate vision."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
   }
 ];
